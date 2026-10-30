@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Planing
+demo/
+PLAN.md
+
+# Logs
+*.log
+npm-debug.log*
+
+
+# Stray files
+nul
+
