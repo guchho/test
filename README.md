@@ -85,7 +85,7 @@ Limitations:
 
 ## Configuration
 
-Create `guchho-test.config.ts` (or `.js`, `.mjs`, `.json`) in the project root:
+Create `guchho.test.config.ts` (or `.js`, `.mjs`, `.json`) in the project root:
 
 ```ts
 import { defineConfig } from '@guchho/test';

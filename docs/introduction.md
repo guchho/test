@@ -21,7 +21,7 @@ to modern test runners while remaining an independent implementation.
   with inline source maps.
 - **CLI:** discovery, filtering, bail, parallel workers, pools, coverage,
   reporters, watch mode, and stable exit codes.
-- **Configuration:** `guchho-test.config.{ts,js,mjs,json}` with validation and
+- **Configuration:** `guchho.test.config.{ts,js,mjs,json}` with validation and
   CLI-over-config precedence.
 - **Coverage:** V8 coverage with source-map mapping, text/HTML/JSON reports, and
   thresholds.

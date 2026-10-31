@@ -62,7 +62,7 @@ async function withTempDirectory(fn) {
 test('loads plugins and runs custom reporters with options', async () => {
   await withTempDirectory(async (directory) => {
     await writeFile(
-      path.join(directory, 'guchho-test.config.js'),
+      path.join(directory, 'guchho.test.config.js'),
       'export default {\n' +
         "  plugins: ['./plugin.js'],\n" +
         "  reporters: [['custom', { label: 'CUSTOM' }]],\n" +

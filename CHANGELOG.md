@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `toHaveBeenCalledWith`.
 - ESM module mocking through loader hooks with registration isolation, original
   module restore, and validation for unsupported scenarios.
-- Configuration discovery (`guchho-test.config.{ts,js,mjs,json}`), explicit
+- Configuration discovery (`guchho.test.config.{ts,js,mjs,json}`), explicit
   `--config`, validation with actionable errors, and CLI > config > defaults
   precedence.
 - TypeScript test execution for `.ts`, `.mts`, and `.cts` (CommonJS transform),

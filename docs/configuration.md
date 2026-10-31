@@ -8,10 +8,10 @@ explicitly with `--config`.
 In precedence order within a directory:
 
 ```text
-guchho-test.config.ts
-guchho-test.config.js
-guchho-test.config.mjs
-guchho-test.config.json
+guchho.test.config.ts
+guchho.test.config.js
+guchho.test.config.mjs
+guchho.test.config.json
 ```
 
 The CLI starts in the working directory and walks up parent directories until it
@@ -135,9 +135,9 @@ Configuration is validated before running. Errors identify the file and option,
 for example:
 
 ```text
-guchho-test.config.js: "timeout" must be a positive, finite number.
-guchho-test.config.js: unknown configuration option "foo".
-guchho-test.config.js: unknown reporter "mocha".
+guchho.test.config.js: "timeout" must be a positive, finite number.
+guchho.test.config.js: unknown configuration option "foo".
+guchho.test.config.js: unknown reporter "mocha".
 ```
 
 Invalid configuration exits with code `2`.

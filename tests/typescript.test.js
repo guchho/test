@@ -104,7 +104,7 @@ test('discovers and runs TypeScript tests using config include patterns', async 
   await withTempDirectory(async (directory) => {
     await mkdir(path.join(directory, 'checks'), { recursive: true });
     await writeFile(
-      path.join(directory, 'guchho-test.config.ts'),
+      path.join(directory, 'guchho.test.config.ts'),
       `import { defineConfig } from ${JSON.stringify(distIndexUrl)};\n` +
         'export default defineConfig({\n' +
         "  include: ['checks/**/*.check.ts'],\n" +

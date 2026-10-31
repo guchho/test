@@ -12,10 +12,10 @@ import type {
 } from './types.js';
 
 const configFileNames = [
-  'guchho-test.config.ts',
-  'guchho-test.config.js',
-  'guchho-test.config.mjs',
-  'guchho-test.config.json',
+  'guchho.test.config.ts',
+  'guchho.test.config.js',
+  'guchho.test.config.mjs',
+  'guchho.test.config.json',
 ] as const;
 
 const configExtensions = new Set(['.ts', '.js', '.mjs', '.json']);

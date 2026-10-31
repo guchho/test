@@ -84,7 +84,7 @@ async function withTempDirectory(fn) {
 test('collects V8 coverage with source maps and writes reports', async () => {
   await withTempDirectory(async (directory) => {
     await writeFile(
-      path.join(directory, 'guchho-test.config.js'),
+      path.join(directory, 'guchho.test.config.js'),
       'export default {\n' +
         "  coverage: { enabled: true, reporter: ['text', 'html', 'json'] },\n" +
         '};\n',
@@ -120,7 +120,7 @@ test('collects V8 coverage with source maps and writes reports', async () => {
 test('fails the run when coverage thresholds are not met', async () => {
   await withTempDirectory(async (directory) => {
     await writeFile(
-      path.join(directory, 'guchho-test.config.js'),
+      path.join(directory, 'guchho.test.config.js'),
       'export default {\n' +
         "  coverage: { enabled: true, reporter: ['json'], thresholds: { lines: 95 } },\n" +
         '};\n',

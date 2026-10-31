@@ -187,14 +187,14 @@ test('discovers the nearest configuration file', async () => {
   await withTempDirectory(async (directory) => {
     await mkdir(path.join(directory, 'nested', 'deeper'), { recursive: true });
     await writeFile(
-      path.join(directory, 'guchho-test.config.json'),
+      path.join(directory, 'guchho.test.config.json'),
       '{}\n',
     );
 
     const discovered = await discoverConfigFile(
       path.join(directory, 'nested', 'deeper'),
     );
-    assert.equal(discovered, path.join(directory, 'guchho-test.config.json'));
+    assert.equal(discovered, path.join(directory, 'guchho.test.config.json'));
   });
 });
 
@@ -233,7 +233,7 @@ test('discovers tests using include patterns from configuration', async () => {
   await withTempDirectory(async (directory) => {
     await mkdir(path.join(directory, 'custom'), { recursive: true });
     await writeFile(
-      path.join(directory, 'guchho-test.config.json'),
+      path.join(directory, 'guchho.test.config.json'),
       JSON.stringify({ include: ['custom/**/*.check.js'] }),
     );
     await writeFile(
@@ -254,7 +254,7 @@ test('honours an explicit --config path instead of discovery', async () => {
     await mkdir(path.join(directory, 'primary'), { recursive: true });
     await mkdir(path.join(directory, 'alternate'), { recursive: true });
     await writeFile(
-      path.join(directory, 'guchho-test.config.json'),
+      path.join(directory, 'guchho.test.config.json'),
       JSON.stringify({ include: ['primary/**/*.check.js'] }),
     );
     await writeFile(
@@ -284,7 +284,7 @@ test('CLI timeout overrides configuration and defaults', async () => {
   await withTempDirectory(async (directory) => {
     await mkdir(path.join(directory, 'slow'), { recursive: true });
     await writeFile(
-      path.join(directory, 'guchho-test.config.json'),
+      path.join(directory, 'guchho.test.config.json'),
       JSON.stringify({ include: ['slow/**/*.check.js'], timeout: 20 }),
     );
     await writeFile(
@@ -308,7 +308,7 @@ test('CLI timeout overrides configuration and defaults', async () => {
 test('reports configuration errors with exit code 2', async () => {
   await withTempDirectory(async (directory) => {
     await writeFile(
-      path.join(directory, 'guchho-test.config.json'),
+      path.join(directory, 'guchho.test.config.json'),
       JSON.stringify({ unknownOption: true }),
     );
 
@@ -317,7 +317,7 @@ test('reports configuration errors with exit code 2', async () => {
     assert.match(unknown.stderr, /unknown configuration option "unknownOption"/);
 
     await writeFile(
-      path.join(directory, 'guchho-test.config.json'),
+      path.join(directory, 'guchho.test.config.json'),
       '{ invalid',
     );
 

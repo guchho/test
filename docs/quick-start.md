@@ -52,7 +52,7 @@ Exit codes:
 
 ## 4. Add configuration (optional)
 
-Create `guchho-test.config.js` in the project root:
+Create `guchho.test.config.js` in the project root:
 
 ```js
 import { defineConfig } from '@guchho/test';
