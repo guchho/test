@@ -1,3 +1,5 @@
+import { mockModule } from './module.js';
+
 export interface MockResult {
   readonly type: 'return' | 'throw';
   readonly value: unknown;
@@ -50,6 +52,7 @@ export interface MockApi {
   clearAll(): void;
   resetAll(): void;
   restoreAll(): void;
+  module(specifier: string, factory: () => Record<string, unknown>): void;
 }
 
 type SpyArgs<T> = T extends (...args: infer A) => unknown ? A : unknown[];
@@ -384,30 +387,6 @@ export function isMockFunction(value: unknown): value is MockFunction {
   return isObjectLike(value) && internals.has(value);
 }
 
-export function getMockInternal(
-  value: unknown,
-): MockState | undefined {
-  if (!isObjectLike(value)) {
-    return undefined;
-  }
-
-  const internal = internals.get(value);
-  if (internal === undefined) {
-    return undefined;
-  }
-
-  return (value as MockFunction).mock;
-}
-
-export function getMockName(value: unknown): string | undefined {
-  if (!isMockFunction(value)) {
-    return undefined;
-  }
-
-  const internal = internals.get(value);
-  return internal?.original === undefined ? undefined : 'spy';
-}
-
 export const mock: MockApi = {
   fn,
   spyOn,
@@ -434,5 +413,8 @@ export const mock: MockApi = {
         restoreInternal(internal);
       }
     }
+  },
+  module(specifier: string, factory: () => Record<string, unknown>): void {
+    mockModule(specifier, factory);
   },
 };
