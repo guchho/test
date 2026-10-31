@@ -1,22 +1,10 @@
-<p align="center">
-  <a href="https://github.com/guchho">
-    <picture>
-      <img src="https://raw.githubusercontent.com/guchho/.github/refs/heads/main/profile/image/guchho_logo.png" alt="guchho logo" width="200px" />
-    </picture>
-  </a>
-</p>
+## Guchho Test
 
-<p align="center">
+<p>
   <a href="https://www.npmjs.com/package/guchho"><img src="https://img.shields.io/npm/v/guchho" alt="Version"></a>
   <a href="https://github.com/guchho/guchho/blob/master/LICENSE"><img src="https://img.shields.io/github/license/guchho/guchho" alt="License"></a>
   <a href="https://github.com/sponsors/code-hemu"><img src="https://img.shields.io/badge/Sponsor-GitHub-red" alt="Sponsor"></a>
 </p>
-
-<div align="center">
-  <h1>Guchho Test</h1>
-
-</div>
-
 A small, fast, and deterministic testing framework for JavaScript and TypeScript
 projects. Guchho Test provides a familiar `describe`/`it`/`expect` API, isolated
 test execution, TypeScript and JSX transformation, snapshots, mocking, coverage,
