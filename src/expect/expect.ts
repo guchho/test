@@ -45,6 +45,8 @@ export interface Matchers<R = void> {
   toHaveBeenCalled(): R;
   toHaveBeenCalledTimes(expected: number): R;
   toHaveBeenCalledWith(...expected: unknown[]): R;
+  toMatchSnapshot(hint?: string): R;
+  toMatchInlineSnapshot(snapshot?: string): R;
 }
 
 export type AsyncMatchers = Matchers<Promise<void>>;
