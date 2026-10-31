@@ -1,65 +1,26 @@
-# Guchho Test
+<p align="center">
+  <a href="https://github.com/guchho">
+    <picture>
+      <img src="https://raw.githubusercontent.com/guchho/.github/refs/heads/main/profile/image/guchho_logo.png" alt="guchho logo" width="200px" />
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/guchho"><img src="https://img.shields.io/npm/v/guchho" alt="Version"></a>
+  <a href="https://github.com/guchho/guchho/blob/master/LICENSE"><img src="https://img.shields.io/github/license/guchho/guchho" alt="License"></a>
+  <a href="https://github.com/sponsors/code-hemu"><img src="https://img.shields.io/badge/Sponsor-GitHub-red" alt="Sponsor"></a>
+</p>
+
+<div align="center">
+  <h1>Guchho Test</h1>
+
+</div>
 
 A small, fast, and deterministic testing framework for JavaScript and TypeScript
 projects. Guchho Test provides a familiar `describe`/`it`/`expect` API, isolated
 test execution, TypeScript and JSX transformation, snapshots, mocking, coverage,
 watch mode, and a command-line runner designed for predictable results.
-
-## Features
-
-- Test registration with `describe`, `suite`, `it`, and `test`.
-- Focused, skipped, and todo tests with `only`, `skip`, and `todo`.
-- Synchronous and asynchronous tests with per-test timeouts.
-- Assertions with `expect`, `.not`, `.resolves`, `.rejects`, and custom matchers.
-- Lifecycle hooks with deterministic ordering across nested suites.
-- Mock functions, spies, constructor mocks, and ESM module mocking.
-- External and inline snapshots with update mode.
-- TypeScript and JSX test files with inline source maps.
-- V8 coverage with text, HTML, and JSON reports plus thresholds.
-- Built-in `default`, `verbose`, `dot`, `json`, and `junit` reporters.
-- Plugin-provided reporters.
-- Parallel file execution using worker threads or child processes.
-- Watch mode that reruns only the test files affected by a change.
-- Configuration discovery with validation and CLI-over-config precedence.
-
-## Requirements
-
-- Node.js `>=20.19.0`
-- npm
-- An ESM project (`"type": "module"`) or ESM test files such as `.mjs` and `.mts`
-
-## Installation
-
-Install Guchho Test as a development dependency:
-
-```bash
-npm install --save-dev @guchho/test
-```
-
-Verify the command-line interface:
-
-```bash
-npx guchho-test --version
-npx guchho-test --help
-```
-
-Add a test script to `package.json`:
-
-```json
-{
-  "scripts": {
-    "test": "guchho-test run"
-  }
-}
-```
-
-Then run the suite with:
-
-```bash
-npm test
-```
-
-## Quick start
 
 Create `src/math.test.js`:
 
@@ -721,4 +682,4 @@ Full documentation lives in [`docs/`](./docs/README.md), covering:
 
 ## License
 
-MIT
+Guchho is licensed under **MIT**. Copyright © [CodeHemu](https://github.com/code-hemu).
