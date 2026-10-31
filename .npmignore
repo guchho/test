@@ -1,0 +1,33 @@
+# Development source and tests
+src/
+tests/
+demo/
+scripts/
+.github/
+
+# Tooling and editor configuration
+tsconfig*.json
+.vscode/
+.idea/
+.editorconfig
+
+# Lockfiles and package manager logs
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local and generated output
+coverage/
+dist-bundle/
+*.tsbuildinfo
+*.log
+.env
+.env.*
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
