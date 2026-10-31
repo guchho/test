@@ -45,7 +45,7 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist', { recursive: true, force: true }))\"",
+    "clean": "remove-item dist --recursive --force",
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test",
@@ -55,6 +55,7 @@
     "@types/node": "^22.10.0"
   },
   "dependencies": {
+    "remove-item": "^1.0.3",
     "typescript": "^5.7.0"
   }
 }
