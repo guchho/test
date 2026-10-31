@@ -1,5 +1,24 @@
+import type { ReporterName } from '../config/types.js';
+import type { ExecutionPool } from '../runner/types.js';
+
+export interface RunCommand {
+  readonly kind: 'run';
+  readonly files: string[];
+  readonly filter: string | undefined;
+  readonly testNamePattern: string | undefined;
+  readonly config: string | undefined;
+  readonly timeout: number | undefined;
+  readonly reporter: ReporterName | undefined;
+  readonly maxWorkers: number | undefined;
+  readonly pool: ExecutionPool | undefined;
+  readonly bail: boolean;
+  readonly updateSnapshots: boolean;
+  readonly coverage: boolean;
+  readonly watch: boolean;
+}
+
 export type ParsedCommand =
-  | { readonly kind: 'run'; readonly files: string[]; readonly filter: string | undefined }
+  | RunCommand
   | { readonly kind: 'help' }
   | { readonly kind: 'version' };
 
@@ -7,20 +26,100 @@ export class CliError extends Error {
   override readonly name = 'CliError';
 }
 
-function readFilterValue(argv: readonly string[], index: number): string {
+const reporterNames = new Set<ReporterName>([
+  'default',
+  'verbose',
+  'dot',
+  'json',
+  'junit',
+]);
+
+const poolNames = new Set<ExecutionPool>(['threads', 'forks']);
+
+function readValue(
+  argv: readonly string[],
+  index: number,
+  option: string,
+): string {
   const value = argv[index];
 
   if (value === undefined || value.length === 0) {
-    throw new CliError('The --filter option requires a value.');
+    throw new CliError(`The ${option} option requires a value.`);
   }
 
   return value;
 }
 
+function readTimeoutValue(argv: readonly string[], index: number): number {
+  const timeout = Number(readValue(argv, index, '--timeout'));
+  if (!Number.isFinite(timeout) || timeout <= 0) {
+    throw new CliError('The --timeout option requires a positive number.');
+  }
+
+  return timeout;
+}
+
+function readMaxWorkersValue(argv: readonly string[], index: number): number {
+  const value = readValue(argv, index, '--maxWorkers');
+  const maxWorkers = Number(value);
+
+  if (!Number.isInteger(maxWorkers) || maxWorkers <= 0) {
+    throw new CliError(
+      'The --maxWorkers option requires a positive integer.',
+    );
+  }
+
+  return maxWorkers;
+}
+
+function readReporterValue(
+  argv: readonly string[],
+  index: number,
+): ReporterName {
+  const value = readValue(argv, index, '--reporter');
+
+  if (!reporterNames.has(value as ReporterName)) {
+    throw new CliError(`Unknown reporter: ${value}`);
+  }
+
+  return value as ReporterName;
+}
+
+function readPoolValue(argv: readonly string[], index: number): ExecutionPool {
+  const value = readValue(argv, index, '--pool');
+
+  if (!poolNames.has(value as ExecutionPool)) {
+    throw new CliError(
+      `Unknown pool: ${value}. Supported pools are "threads" and "forks".`,
+    );
+  }
+
+  return value as ExecutionPool;
+}
+
 export function parseArgs(argv: readonly string[]): ParsedCommand {
   const files: string[] = [];
   let filter: string | undefined;
-  let commandSeen = false;
+  let testNamePattern: string | undefined;
+  let config: string | undefined;
+  let timeout: number | undefined;
+  let reporter: ReporterName | undefined;
+  let maxWorkers: number | undefined;
+  let pool: ExecutionPool | undefined;
+  let bail = false;
+  let updateSnapshots = false;
+  let coverage = false;
+  let watch = false;
+  let command: 'run' | 'watch' | undefined;
+
+  const selectCommand = (next: 'run' | 'watch'): void => {
+    if (command !== undefined && command !== next) {
+      throw new CliError('Only one command may be provided.');
+    }
+
+    command = next;
+    watch = next === 'watch';
+  };
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -37,27 +136,117 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
       return { kind: 'version' };
     }
 
-    if (argument === 'run' || argument === '--run') {
-      if (commandSeen) {
-        throw new CliError('Only one command may be provided.');
-      }
-
-      commandSeen = true;
+    if (argument === 'run') {
+      selectCommand('run');
       continue;
     }
 
-    if (argument === 'watch') {
-      throw new CliError('Watch mode is not available in this version.');
+    if (argument === 'watch' || argument === '--watch') {
+      selectCommand('watch');
+      continue;
+    }
+
+    if (argument === '--run') {
+      selectCommand('run');
+      continue;
+    }
+
+    if (argument === '--bail') {
+      bail = true;
+      continue;
+    }
+
+    if (argument === '--update' || argument === '-u') {
+      updateSnapshots = true;
+      continue;
+    }
+
+    if (argument === '--coverage') {
+      coverage = true;
+      continue;
     }
 
     if (argument === '--filter') {
       index += 1;
-      filter = readFilterValue(argv, index);
+      filter = readValue(argv, index, '--filter');
       continue;
     }
 
     if (argument.startsWith('--filter=')) {
-      filter = readFilterValue([argument.slice('--filter='.length)], 0);
+      filter = readValue([argument.slice('--filter='.length)], 0, '--filter');
+      continue;
+    }
+
+    if (argument === '--testNamePattern') {
+      index += 1;
+      testNamePattern = readValue(argv, index, '--testNamePattern');
+      continue;
+    }
+
+    if (argument.startsWith('--testNamePattern=')) {
+      testNamePattern = readValue(
+        [argument.slice('--testNamePattern='.length)],
+        0,
+        '--testNamePattern',
+      );
+      continue;
+    }
+
+    if (argument === '--config') {
+      index += 1;
+      config = readValue(argv, index, '--config');
+      continue;
+    }
+
+    if (argument.startsWith('--config=')) {
+      config = readValue([argument.slice('--config='.length)], 0, '--config');
+      continue;
+    }
+
+    if (argument === '--timeout') {
+      index += 1;
+      timeout = readTimeoutValue(argv, index);
+      continue;
+    }
+
+    if (argument.startsWith('--timeout=')) {
+      timeout = readTimeoutValue([argument.slice('--timeout='.length)], 0);
+      continue;
+    }
+
+    if (argument === '--reporter') {
+      index += 1;
+      reporter = readReporterValue(argv, index);
+      continue;
+    }
+
+    if (argument.startsWith('--reporter=')) {
+      reporter = readReporterValue([argument.slice('--reporter='.length)], 0);
+      continue;
+    }
+
+    if (argument === '--maxWorkers') {
+      index += 1;
+      maxWorkers = readMaxWorkersValue(argv, index);
+      continue;
+    }
+
+    if (argument.startsWith('--maxWorkers=')) {
+      maxWorkers = readMaxWorkersValue(
+        [argument.slice('--maxWorkers='.length)],
+        0,
+      );
+      continue;
+    }
+
+    if (argument === '--pool') {
+      index += 1;
+      pool = readPoolValue(argv, index);
+      continue;
+    }
+
+    if (argument.startsWith('--pool=')) {
+      pool = readPoolValue([argument.slice('--pool='.length)], 0);
       continue;
     }
 
@@ -73,5 +262,19 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
     files.push(argument);
   }
 
-  return { kind: 'run', files, filter };
+  return {
+    kind: 'run',
+    files,
+    filter,
+    testNamePattern,
+    config,
+    timeout,
+    reporter,
+    maxWorkers,
+    pool,
+    bail,
+    updateSnapshots,
+    coverage,
+    watch,
+  };
 }
