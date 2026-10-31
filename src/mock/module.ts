@@ -1,13 +1,13 @@
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { register } from 'node:module';
+import * as nodeModule from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-interface RegisteredModuleMock {
-  readonly id: string;
-  readonly exports: readonly string[];
-}
+import { generateModuleSource } from './generate.js';
+import type { GeneratedModuleMock } from './generate.js';
+
+type RegisteredModuleMock = GeneratedModuleMock;
 
 const registrySymbol = Symbol.for('@guchho/test/mock-module-registry');
 
@@ -92,7 +92,7 @@ function findCallerFile(): string | undefined {
 
     for (const callSite of stack) {
       const fileName = callSite.getFileName();
-      if (fileName === undefined || fileName.length === 0) {
+      if (fileName === null || fileName.length === 0) {
         continue;
       }
 
@@ -127,10 +127,8 @@ function resolveTarget(specifier: string): string {
   }
 
   if (specifier.startsWith('.') || path.isAbsolute(specifier)) {
-    const parent = currentTestFile ?? findCallerFile() ?? process.cwd();
-    const base = existsSync(parent) && !parent.endsWith(path.sep)
-      ? path.dirname(parent)
-      : parent;
+    const parent = currentTestFile ?? findCallerFile();
+    const base = parent === undefined ? process.cwd() : path.dirname(parent);
 
     return path.resolve(base, specifier);
   }
@@ -144,14 +142,125 @@ function isValidExportName(name: string): boolean {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) && !reservedWords.has(name);
 }
 
+interface InlineResolveResult {
+  readonly url: string;
+  readonly shortCircuit?: boolean;
+}
+
+interface InlineLoadResult {
+  readonly format?: string;
+  readonly source?: string | ArrayBuffer;
+  readonly shortCircuit?: boolean;
+}
+
+type NextResolve = (
+  specifier: string,
+  context: unknown,
+) => InlineResolveResult;
+
+type NextLoad = (url: string, context: unknown) => InlineLoadResult;
+
+interface InlineHooks {
+  readonly resolve?: (
+    specifier: string,
+    context: unknown,
+    nextResolve: NextResolve,
+  ) => InlineResolveResult;
+  readonly load?: (
+    url: string,
+    context: unknown,
+    nextLoad: NextLoad,
+  ) => InlineLoadResult;
+}
+
+type RegisterHooks = (hooks: InlineHooks) => void;
+
+function normalizeUrl(url: string): string {
+  const parsed = new URL(url);
+  parsed.search = '';
+  parsed.hash = '';
+  return parsed.href;
+}
+
+function inlineResolve(
+  specifier: string,
+  context: unknown,
+  nextResolve: NextResolve,
+): InlineResolveResult {
+  const result = nextResolve(specifier, context);
+
+  if (!result.url.startsWith('file:')) {
+    return result;
+  }
+
+  const parsed = new URL(result.url);
+  if (parsed.searchParams.has('guchho-mock')) {
+    return result;
+  }
+
+  const entry = registeredModules.get(normalizeUrl(result.url));
+  if (entry === undefined) {
+    return result;
+  }
+
+  parsed.searchParams.set('guchho-mock', entry.id);
+  return { url: parsed.href, shortCircuit: true };
+}
+
+function inlineLoad(
+  url: string,
+  context: unknown,
+  nextLoad: NextLoad,
+): InlineLoadResult {
+  if (!url.startsWith('file:')) {
+    return nextLoad(url, context);
+  }
+
+  const parsed = new URL(url);
+  const id = parsed.searchParams.get('guchho-mock');
+  if (id === null) {
+    return nextLoad(url, context);
+  }
+
+  const entry = registeredModules.get(normalizeUrl(url));
+  if (entry === undefined || entry.id !== id) {
+    return nextLoad(url, context);
+  }
+
+  return {
+    format: 'module',
+    source: generateModuleSource(entry),
+    shortCircuit: true,
+  };
+}
+
 function ensureLoader(): void {
   if (loaderRegistered) {
+    return;
+  }
+
+  const registerHooks = (
+    nodeModule as unknown as { registerHooks?: RegisterHooks }
+  ).registerHooks;
+
+  if (typeof registerHooks === 'function') {
+    registerHooks({ resolve: inlineResolve, load: inlineLoad });
+    loaderRegistered = true;
     return;
   }
 
   const directory = mkdtempSync(path.join(tmpdir(), 'guchho-module-mocks-'));
   registryPath = path.join(directory, 'registry.json');
   writeFileSync(registryPath, '{}');
+
+  const register = (
+    nodeModule as unknown as {
+      register(
+        specifier: string,
+        options: { data: { registryPath: string } },
+      ): void;
+    }
+  ).register;
 
   register(new URL('./loader.js', import.meta.url).href, {
     data: { registryPath },
