@@ -62,4 +62,21 @@ export type {
   MockResult,
   MockState,
 } from './mock/mock.js';
+export { definePlugin, defineReporter } from './plugins/types.js';
+export type {
+  GuchhoPlugin,
+  ReporterFactory,
+} from './plugins/types.js';
+export type {
+  FileReport,
+  Reporter,
+  ReporterIO,
+  RunReport,
+} from './reporters/types.js';
+export type {
+  CoverageMetric,
+  CoverageReport,
+  CoverageTotals,
+  FileCoverage,
+} from './coverage/types.js';
 export { version } from './version.js';
