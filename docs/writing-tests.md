@@ -1,0 +1,133 @@
+# Writing Tests
+
+Guchho Test uses a suite/test registration API. Tests are registered when the
+file is loaded and executed afterwards by the runner.
+
+## Basic structure
+
+```js
+import { describe, it, expect } from '@guchho/test';
+
+describe('calculator', () => {
+  it('adds', () => {
+    expect(2 + 2).toBe(4);
+  });
+});
+```
+
+`suite` is an alias for `describe`, and `test` is an alias for `it`.
+
+## Nested suites
+
+Suites can be nested. Full test names are joined with ` > `:
+
+```js
+describe('user', () => {
+  describe('validation', () => {
+    it('rejects empty names', () => {
+      // full name: "user > validation > rejects empty names"
+    });
+  });
+});
+```
+
+## Synchronous and asynchronous tests
+
+A test may return a promise. The runner awaits it and applies the per-test
+timeout.
+
+```js
+it('resolves data', async () => {
+  const user = await loadUser(1);
+  expect(user.id).toBe(1);
+});
+```
+
+A rejected promise fails the test.
+
+## Timeouts
+
+The default timeout is `5000` ms. Override it per test with the third argument:
+
+```js
+it('is slow', async () => {
+  await delay(1000);
+}, 10000);
+```
+
+Override the default for all tests in a run with `--timeout` or the `timeout`
+configuration option. Test-level timeouts take precedence.
+
+## Modifiers
+
+### Skip
+
+```js
+it.skip('not ready', () => {});
+
+skip('also skipped', () => {});
+```
+
+A skipped test is reported with status `skipped` and is not executed.
+
+### Only
+
+```js
+it.only('focused', () => {
+  // runs
+});
+
+describe.only('focused suite', () => {
+  // all tests in this suite are focused
+});
+
+only('focused test', () => {});
+```
+
+When any `only` exists, tests that are not marked `only` (directly or through an
+ancestor suite) are reported as skipped.
+
+### Todo
+
+```js
+it.todo('write this later');
+
+todo('also later');
+```
+
+A todo test has no callback and is reported with status `todo`.
+
+## Filters
+
+Filter by substring of the full test name:
+
+```bash
+guchho-test run --filter validation
+```
+
+Filter by regular expression:
+
+```bash
+guchho-test run --testNamePattern "^user > validation"
+```
+
+Filtered-out tests are not reported.
+
+## Test files
+
+Supported extensions: `.js`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.jsx`,
+`.tsx`.
+
+Files are discovered using the `include` and `exclude` patterns, then sorted for
+deterministic execution. Explicit file arguments bypass discovery patterns but
+must exist and be files.
+
+## Isolation
+
+Each test file runs in its own worker (thread by default, or child process with
+`--pool=forks`). Module state and globals do not leak between files.
+
+## What happens with no tests
+
+If a test file registers no tests, the CLI prints a warning. If discovery finds
+no test files at all, the run exits with code `2`.
