@@ -16,14 +16,19 @@ export interface CoverageConfig {
   include?: string[];
   exclude?: string[];
   thresholds?: CoverageThresholds;
+  reportsDirectory?: string;
 }
 
-export type ReporterEntry = ReporterName | [ReporterName, Record<string, unknown>];
+export type ReporterEntry =
+  | ReporterName
+  | [ReporterName, Record<string, unknown>]
+  | [string, Record<string, unknown>];
 
 export interface GuchhoConfig {
   include?: string[];
   exclude?: string[];
   timeout?: number;
   reporters?: ReporterEntry[];
+  plugins?: string[];
   coverage?: CoverageConfig;
 }
