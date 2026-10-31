@@ -1,6 +1,6 @@
 {
   "name": "@guchho/test",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Lightweight JavaScript and TypeScript testing framework for the Guchho ecosystem.",
   "type": "module",
   "license": "MIT",
@@ -38,6 +38,7 @@
   },
   "files": [
     "dist",
+    "docs",
     "CHANGELOG.md"
   ],
   "engines": {
@@ -51,7 +52,9 @@
     "prepublishOnly": "npm run typecheck && npm test"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^22.10.0"
+  },
+  "dependencies": {
     "typescript": "^5.7.0"
   }
 }
