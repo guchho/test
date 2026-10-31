@@ -5,6 +5,7 @@
   <a href="https://github.com/guchho/test/blob/master/LICENSE"><img src="https://img.shields.io/github/license/guchho/test" alt="License"></a>
   <a href="https://github.com/sponsors/code-hemu"><img src="https://img.shields.io/badge/Sponsor-GitHub-red" alt="Sponsor"></a>
 </p>
+
 A small, fast, and deterministic testing framework for JavaScript and TypeScript
 projects. Guchho Test provides a familiar `describe`/`it`/`expect` API, isolated
 test execution, TypeScript and JSX transformation, snapshots, mocking, coverage,
