@@ -66,8 +66,12 @@ export interface HookError {
   readonly error: unknown;
 }
 
+export type ExecutionPool = 'threads' | 'forks';
+
 export interface RunOptions {
   readonly timeout?: number | undefined;
   readonly filter?: string | undefined;
+  readonly testNamePattern?: RegExp | undefined;
+  readonly bail?: boolean | undefined;
   readonly onResult?: ((result: TestResult) => void) | undefined;
 }
