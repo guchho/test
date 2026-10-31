@@ -16,6 +16,20 @@ export const defaultExclude = Object.freeze([
 
 export const defaultTimeout = 5000;
 
+export const defaultCoverageInclude = Object.freeze([
+  '**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+]);
+
+export const defaultCoverageExclude = Object.freeze([
+  '**/node_modules/**',
+  '**/dist/**',
+  '**/tests/**',
+  '**/*.test.*',
+  '**/*.spec.*',
+  '**/__snapshots__/**',
+  '**/coverage/**',
+]);
+
 export const defaultConfig: Readonly<GuchhoConfig> = Object.freeze({
   include: [...defaultInclude],
   exclude: [...defaultExclude],
@@ -25,5 +39,8 @@ export const defaultConfig: Readonly<GuchhoConfig> = Object.freeze({
     enabled: false,
     provider: 'v8',
     reporter: ['text', 'html'] as CoverageReporterName[],
+    include: [...defaultCoverageInclude],
+    exclude: [...defaultCoverageExclude],
+    reportsDirectory: 'coverage',
   }),
 });
