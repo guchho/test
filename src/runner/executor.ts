@@ -1,6 +1,10 @@
 import { performance } from 'node:perf_hooks';
 
 import { defaultTimeout } from '../config/defaults.js';
+import {
+  beginSnapshotTest,
+  endSnapshotTest,
+} from '../snapshot/session.js';
 import type {
   HookError,
   HookFunction,
@@ -30,6 +34,8 @@ interface ExecutionState {
   readonly errors: HookError[];
   readonly statuses: Map<TestDefinition, TestStatus>;
   readonly timeout: number;
+  readonly bail: boolean;
+  bailed: boolean;
   readonly onResult: ((result: TestResult) => void) | undefined;
 }
 
@@ -212,6 +218,10 @@ function suiteLabel(suite: SuiteDefinition): string {
 function recordResult(result: TestResult, state: ExecutionState): void {
   state.results.push(result);
   state.onResult?.(result);
+
+  if (state.bail && result.status === 'failed') {
+    state.bailed = true;
+  }
 }
 
 async function runHook(
@@ -229,6 +239,9 @@ async function runHook(
     return true;
   } catch (error) {
     state.errors.push({ type, suite: suiteLabel(suite), error });
+    if (state.bail) {
+      state.bailed = true;
+    }
     return false;
   }
 }
@@ -281,6 +294,7 @@ async function executeTestWithHooks(
   afterEachHooks: readonly ScopedHook[],
   state: ExecutionState,
 ): Promise<void> {
+  beginSnapshotTest(test.fullName);
   let hookFailure: { readonly error: unknown } | undefined;
 
   for (const hook of beforeEachHooks) {
@@ -305,6 +319,7 @@ async function executeTestWithHooks(
     }
   }
 
+  endSnapshotTest();
   recordResult(result, state);
 }
 
@@ -314,7 +329,7 @@ async function executeSuite(
   ancestorAfterEach: readonly ScopedHook[],
   state: ExecutionState,
 ): Promise<void> {
-  if (!suiteHasRunnableTest(suite, state.statuses)) {
+  if (state.bailed || !suiteHasRunnableTest(suite, state.statuses)) {
     reportSkippedTests(suite, state);
     return;
   }
@@ -342,6 +357,10 @@ async function executeSuite(
     reportSkippedTests(suite, state);
   } else {
     for (const item of suite.items) {
+      if (state.bailed) {
+        break;
+      }
+
       if (item.kind === 'suite') {
         await executeSuite(
           item,
@@ -389,11 +408,19 @@ export async function runSuite(
 
   const hasOnly = containsOnly(rootSuite);
   const filter = options.filter;
+  const testNamePattern = options.testNamePattern;
   const statuses = new Map<TestDefinition, TestStatus>();
 
   for (const entry of collected) {
     if (filter !== undefined && !entry.test.fullName.includes(filter)) {
       continue;
+    }
+
+    if (testNamePattern !== undefined) {
+      testNamePattern.lastIndex = 0;
+      if (!testNamePattern.test(entry.test.fullName)) {
+        continue;
+      }
     }
 
     statuses.set(entry.test, resolveStatus(entry, hasOnly));
@@ -404,6 +431,8 @@ export async function runSuite(
     errors: [],
     statuses,
     timeout: options.timeout ?? defaultTimeout,
+    bail: options.bail ?? false,
+    bailed: false,
     onResult: options.onResult,
   };
 
