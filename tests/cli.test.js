@@ -132,6 +132,36 @@ test('fails a test that exceeds its timeout', async () => {
   );
 });
 
+test('supports lifecycle hooks, mocks, and module mocking', async () => {
+  const result = await runCli([
+    'run',
+    'tests/fixtures/lifecycle-mock.fixture.js',
+  ]);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /✓ lifecycle > runs hooks in order/);
+  assert.match(result.stdout, /✓ mocks > tracks mock calls/);
+  assert.match(result.stdout, /✓ mocks > mocks modules/);
+  assert.match(
+    result.stdout,
+    /Tests: 3 passed, 0 failed, 0 skipped, 0 todo/,
+  );
+  assert.equal(result.stderr, '');
+});
+
+test('reports hook failures with actionable diagnostics', async () => {
+  const result = await runCli(['run', 'tests/fixtures/hook-failure.fixture.js']);
+
+  assert.equal(result.code, 1);
+  assert.match(result.stdout, /✗ beforeAll hook in "<root>" failed/);
+  assert.match(result.stdout, /hook setup boom/);
+  assert.match(result.stdout, /- is skipped after a hook failure \(skipped\)/);
+  assert.match(
+    result.stdout,
+    /Tests: 0 passed, 0 failed, 1 skipped, 0 todo/,
+  );
+});
+
 test('reports module load errors with exit code 2', async () => {
   const result = await runCli(['run', 'tests/fixtures/load-error.fixture.js']);
 
