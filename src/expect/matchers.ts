@@ -1,4 +1,5 @@
 import { isMockFunction } from '../mock/mock.js';
+import { snapshotMatchers } from '../snapshot/matchers.js';
 import type { MockFunction } from '../mock/mock.js';
 import { deepEqual } from './equality.js';
 import type {
@@ -256,6 +257,8 @@ function matchThrow(
 }
 
 export const builtInMatchers: Record<string, Matcher> = {
+  ...snapshotMatchers,
+
   toBe(actual, expected) {
     return {
       pass: Object.is(actual, expected),
