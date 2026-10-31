@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 
+import { generateModuleSource } from './generate.js';
+import type { GeneratedModuleMock } from './generate.js';
+
 interface LoaderData {
   readonly registryPath?: unknown;
 }
 
-interface ModuleMockEntry {
-  readonly id: string;
-  readonly exports: readonly string[];
-}
+type ModuleMockEntry = GeneratedModuleMock;
 
 type ModuleRegistry = Record<string, ModuleMockEntry>;
 
@@ -41,29 +41,6 @@ function normalizeUrl(url: string): string {
   parsed.search = '';
   parsed.hash = '';
   return parsed.href;
-}
-
-function generateSource(entry: ModuleMockEntry): string {
-  const lines = [
-    'const __guchhoRegistry = globalThis[Symbol.for("@guchho/test/mock-module-registry")];',
-    `const __guchhoExports = __guchhoRegistry?.get(${JSON.stringify(entry.id)});`,
-    `if (__guchhoExports === undefined) {`,
-    `  throw new Error("Guchho module mock ${entry.id} is not registered. Call mock.module() before importing the mocked module.");`,
-    '}',
-  ];
-
-  for (const name of entry.exports) {
-    if (name === 'default') {
-      lines.push('export default __guchhoExports["default"];');
-      continue;
-    }
-
-    lines.push(
-      `export const ${name} = __guchhoExports[${JSON.stringify(name)}];`,
-    );
-  }
-
-  return lines.join('\n');
 }
 
 export async function resolve(
@@ -124,7 +101,7 @@ export async function load(
 
   return {
     format: 'module',
-    source: generateSource(entry),
+    source: generateModuleSource(entry),
     shortCircuit: true,
   };
 }
