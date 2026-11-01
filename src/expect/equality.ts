@@ -1,3 +1,4 @@
+import { isAsymmetricMatcher } from './asymmetric.js';
 import type { EqualityTest } from './types.js';
 
 type SeenPairs = WeakMap<object, WeakSet<object>>;
@@ -301,6 +302,12 @@ function equalsInternal(
 ): boolean {
   if (Object.is(actual, expected)) {
     return true;
+  }
+
+  if (isAsymmetricMatcher(expected)) {
+    return expected.asymmetricMatch(actual, (left, right) =>
+      equalsInternal(left, right, strict, seen),
+    );
   }
 
   for (const test of equalityTests) {
