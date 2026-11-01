@@ -80,6 +80,9 @@ interface DescribeApi {
   (name: string, fn: () => void): void;
   skip(name: string, fn: () => void): void;
   only(name: string, fn: () => void): void;
+  each<TArgs extends readonly unknown[]>(
+    cases: readonly TArgs[],
+  ): (name: string, fn: (...args: TArgs) => void) => void;
 }
 ```
 
@@ -91,8 +94,17 @@ interface TestApi {
   skip(name: string, fn?: () => void | Promise<unknown>, timeout?: number): void;
   only(name: string, fn?: () => void | Promise<unknown>, timeout?: number): void;
   todo(name: string): void;
+  each<TArgs extends readonly unknown[]>(
+    cases: readonly TArgs[],
+  ): (
+    name: string,
+    fn: (...args: TArgs) => void | Promise<unknown>,
+    timeout?: number,
+  ) => void;
 }
 ```
+
+`EachTest` and `EachDescribe` are the corresponding `each` method types.
 
 ## Lifecycle hooks
 
@@ -120,11 +132,23 @@ Hooks may return a promise. See [Lifecycle Hooks](./lifecycle-hooks.md).
 expect(actual): Expectation
 expect.extend(matchers): void
 expect.addEqualityTest(test): () => void
+expect.any(Constructor): AsymmetricMatcher
+expect.anything(): AsymmetricMatcher
+expect.objectContaining(object): AsymmetricMatcher
+expect.arrayContaining(array): AsymmetricMatcher
+expect.stringContaining(string): AsymmetricMatcher
+expect.stringMatching(stringOrRegExp): AsymmetricMatcher
+expect.closeTo(number, digits?): AsymmetricMatcher
 ```
 
 ### `expect(actual)`
 
 Returns an expectation with all matchers, plus `not`, `resolves`, and `rejects`.
+
+### `expect.any` and other asymmetric matchers
+
+Asymmetric matchers describe expected values inside other assertions. See
+[Assertions](./assertions.md#asymmetric-matchers).
 
 ### `expect.extend(matchers)`
 
@@ -241,8 +265,11 @@ The package version as a string.
 ### Assertion types
 
 ```ts
+AsymmetricMatcher;
+AsymmetricMatchers;
 AsyncExpectation;
 AsyncMatchers;
+Equals;
 EqualityTest;
 Expect;
 Expectation;
@@ -258,6 +285,9 @@ MatcherUtils;
 
 ```ts
 DescribeApi;
+EachCase;
+EachDescribe;
+EachTest;
 HookError;
 HookFunction;
 HookType;
