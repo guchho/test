@@ -1,6 +1,11 @@
 import type { ReporterName } from '../config/types.js';
 import type { ExecutionPool } from '../runner/types.js';
 
+export interface ShardOptions {
+  readonly index: number;
+  readonly count: number;
+}
+
 export interface RunCommand {
   readonly kind: 'run';
   readonly files: string[];
@@ -11,6 +16,7 @@ export interface RunCommand {
   readonly reporter: ReporterName | undefined;
   readonly maxWorkers: number | undefined;
   readonly pool: ExecutionPool | undefined;
+  readonly shard: ShardOptions | undefined;
   readonly bail: boolean;
   readonly updateSnapshots: boolean;
   readonly coverage: boolean;
@@ -85,6 +91,37 @@ function readReporterValue(
   return value as ReporterName;
 }
 
+function readShardValue(
+  argv: readonly string[],
+  index: number,
+): ShardOptions {
+  const value = readValue(argv, index, '--shard');
+  const match = /^(\d+)\/(\d+)$/.exec(value);
+
+  if (match === null) {
+    throw new CliError(
+      'The --shard option requires a value in the form <index>/<count>.',
+    );
+  }
+
+  const shardIndex = Number(match[1]);
+  const shardCount = Number(match[2]);
+
+  if (
+    !Number.isSafeInteger(shardIndex) ||
+    !Number.isSafeInteger(shardCount) ||
+    shardIndex < 1 ||
+    shardCount < 1 ||
+    shardIndex > shardCount
+  ) {
+    throw new CliError(
+      'The --shard option requires 1 <= index <= count.',
+    );
+  }
+
+  return { index: shardIndex, count: shardCount };
+}
+
 function readPoolValue(argv: readonly string[], index: number): ExecutionPool {
   const value = readValue(argv, index, '--pool');
 
@@ -106,6 +143,7 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
   let reporter: ReporterName | undefined;
   let maxWorkers: number | undefined;
   let pool: ExecutionPool | undefined;
+  let shard: ShardOptions | undefined;
   let bail = false;
   let updateSnapshots = false;
   let coverage = false;
@@ -250,6 +288,17 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
       continue;
     }
 
+    if (argument === '--shard') {
+      index += 1;
+      shard = readShardValue(argv, index);
+      continue;
+    }
+
+    if (argument.startsWith('--shard=')) {
+      shard = readShardValue([argument.slice('--shard='.length)], 0);
+      continue;
+    }
+
     if (argument === '--') {
       files.push(...argv.slice(index + 1));
       break;
@@ -262,6 +311,10 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
     files.push(argument);
   }
 
+  if (watch && shard !== undefined) {
+    throw new CliError('The --shard option cannot be used with watch mode.');
+  }
+
   return {
     kind: 'run',
     files,
@@ -272,6 +325,7 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
     reporter,
     maxWorkers,
     pool,
+    shard,
     bail,
     updateSnapshots,
     coverage,
