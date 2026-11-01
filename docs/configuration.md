@@ -27,6 +27,8 @@ export default defineConfig({
   exclude: ['**/node_modules/**', '**/dist/**'],
   timeout: 5000,
   reporters: ['default'],
+  setupFiles: ['./tests/setup.js'],
+  setupFilesAfterEnv: ['./tests/setup-after-env.js'],
   coverage: {
     enabled: false,
     reporter: ['text', 'html'],
@@ -58,9 +60,31 @@ build step is required.
 | `timeout` | `number` | Per-test and per-hook timeout in milliseconds. Must be positive and finite. |
 | `reporters` | `ReporterEntry[]` | Reporters to run. |
 | `plugins` | `string[]` | Paths to plugin modules, resolved from the working directory. |
+| `setupFiles` | `string[]` | Modules to load before `setupFilesAfterEnv` and the test file, resolved from the working directory. |
+| `setupFilesAfterEnv` | `string[]` | Modules to load after `setupFiles` and before the test file, resolved from the working directory. |
 | `coverage` | `CoverageConfig` | Coverage options. |
 
 Unknown top-level options are rejected.
+
+### `setupFiles` and `setupFilesAfterEnv`
+
+Setup modules run once per test file, inside that file's worker process. Entries
+are resolved from the working directory and may be `.js`, `.mjs`, `.cjs`, or
+`.ts` files.
+
+Execution order for each test file:
+
+1. every `setupFiles` entry, in array order;
+2. every `setupFilesAfterEnv` entry, in array order;
+3. the test file itself.
+
+```js
+setupFiles: ['./tests/setup-environment.js'],
+setupFilesAfterEnv: ['./tests/setup-matchers.js'];
+```
+
+A setup module that throws, or cannot be loaded, aborts that test file and exits
+with code `2`. The error identifies the failing setup file.
 
 ### `reporters`
 
@@ -119,6 +143,8 @@ Default coverage exclude:
 | `timeout` | `5000` |
 | `reporters` | `['default']` |
 | `plugins` | `[]` |
+| `setupFiles` | `[]` |
+| `setupFilesAfterEnv` | `[]` |
 
 ## Precedence
 
