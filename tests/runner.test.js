@@ -338,3 +338,287 @@ nodeTest('validates hook registration input', () => {
   assert.throws(() => beforeEach(null), TypeError);
   assert.throws(() => afterEach(42), TypeError);
 });
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+nodeTest('runs it.concurrent tests in parallel in registration order', async () => {
+  let active = 0;
+  let maxActive = 0;
+
+  const result = await run(() => {
+    it.concurrent('first', async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await delay(20);
+      active -= 1;
+    });
+
+    it.concurrent('second', async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await delay(20);
+      active -= 1;
+    });
+  });
+
+  assert.equal(maxActive, 2);
+  assert.deepEqual(
+    result.results.map((entry) => entry.fullName),
+    ['first', 'second'],
+  );
+  assert.equal(result.summary.passed, 2);
+});
+
+nodeTest('describe.concurrent runs nested tests concurrently', async () => {
+  let active = 0;
+  let maxActive = 0;
+  let beforeAllCount = 0;
+  let afterAllCount = 0;
+  let beforeEachCount = 0;
+
+  const track = async () => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await delay(20);
+    active -= 1;
+  };
+
+  const result = await run(() => {
+    describe.concurrent('parallel', () => {
+      beforeAll(() => {
+        beforeAllCount += 1;
+      });
+      beforeEach(() => {
+        beforeEachCount += 1;
+      });
+      afterAll(() => {
+        afterAllCount += 1;
+      });
+
+      it('first', track);
+
+      describe('nested', () => {
+        it('second', track);
+        it('third', track);
+      });
+    });
+  });
+
+  assert.equal(maxActive, 3);
+  assert.equal(beforeAllCount, 1);
+  assert.equal(afterAllCount, 1);
+  assert.equal(beforeEachCount, 3);
+  assert.equal(result.summary.passed, 3);
+});
+
+nodeTest('runs concurrent tests as a batch before later sequential tests', async () => {
+  const order = [];
+
+  const result = await run(() => {
+    it.concurrent('first', async () => {
+      order.push('first start');
+      await delay(20);
+      order.push('first end');
+    });
+
+    it.concurrent('second', async () => {
+      order.push('second start');
+      await delay(20);
+      order.push('second end');
+    });
+
+    it('after', () => {
+      order.push('after');
+    });
+  });
+
+  assert.deepEqual(order.slice(0, 2), ['first start', 'second start']);
+  assert.equal(order[order.length - 1], 'after');
+  assert.equal(result.summary.passed, 3);
+});
+
+nodeTest('supports it.runIf and it.skipIf', async () => {
+  const order = [];
+  const result = await run(() => {
+    it.runIf(true)('runs when true', () => order.push('run true'));
+    it.runIf(false)('skips when false', () => order.push('run false'));
+    it.skipIf(true)('skips when true', () => order.push('skip true'));
+    it.skipIf(false)('runs when false', () => order.push('skip false'));
+  });
+
+  assert.deepEqual(order, ['run true', 'skip false']);
+  assert.deepEqual(
+    result.results.map((entry) => [entry.fullName, entry.status]),
+    [
+      ['runs when true', 'passed'],
+      ['skips when false', 'skipped'],
+      ['skips when true', 'skipped'],
+      ['runs when false', 'passed'],
+    ],
+  );
+});
+
+nodeTest('supports conditional table tests', async () => {
+  const order = [];
+  const result = await run(() => {
+    it.runIf(true).each([
+      [1],
+      [2],
+    ])('runs %d', (value) => order.push(value));
+
+    it.skipIf(true).each([
+      [3],
+      [4],
+    ])('skips %d', (value) => order.push(value));
+  });
+
+  assert.deepEqual(order, [1, 2]);
+  assert.equal(result.summary.passed, 2);
+  assert.equal(result.summary.skipped, 2);
+});
+
+nodeTest('validates conditional modifier input', () => {
+  resetRegistry();
+
+  assert.throws(() => it.runIf('yes'), TypeError);
+  assert.throws(() => it.skipIf(1), TypeError);
+});
+
+nodeTest('retries failing tests using the retry option', async () => {
+  let attempts = 0;
+  const result = await run(() => {
+    it(
+      'eventually passes',
+      () => {
+        attempts += 1;
+        if (attempts < 3) {
+          throw new Error(`attempt ${attempts}`);
+        }
+      },
+      { retry: 2 },
+    );
+  });
+
+  assert.equal(attempts, 3);
+  assert.equal(result.summary.passed, 1);
+  assert.equal(result.summary.failed, 0);
+});
+
+nodeTest('reports the final failure after retries are exhausted', async () => {
+  let attempts = 0;
+  const result = await run(() => {
+    it(
+      'never passes',
+      () => {
+        attempts += 1;
+        throw new Error(`failure ${attempts}`);
+      },
+      { retry: 1 },
+    );
+  });
+
+  assert.equal(attempts, 2);
+  assert.equal(result.summary.failed, 1);
+  assert.match(result.results[0].error.message, /failure 2/);
+});
+
+nodeTest('supports it.retry in curried and direct forms', async () => {
+  let curriedAttempts = 0;
+  let directAttempts = 0;
+
+  const result = await run(() => {
+    it.retry(1)('curried', () => {
+      curriedAttempts += 1;
+      if (curriedAttempts < 2) {
+        throw new Error('retry');
+      }
+    });
+
+    it.retry('direct', () => {
+      directAttempts += 1;
+      if (directAttempts < 2) {
+        throw new Error('retry');
+      }
+    }, 1);
+  });
+
+  assert.equal(curriedAttempts, 2);
+  assert.equal(directAttempts, 2);
+  assert.equal(result.summary.passed, 2);
+});
+
+nodeTest('retries the test cycle including lifecycle hooks', async () => {
+  let attempts = 0;
+  let beforeEachCount = 0;
+  let afterEachCount = 0;
+
+  const result = await run(() => {
+    beforeEach(() => {
+      beforeEachCount += 1;
+    });
+    afterEach(() => {
+      afterEachCount += 1;
+    });
+
+    it(
+      'retries hooks',
+      () => {
+        attempts += 1;
+        if (attempts < 2) {
+          throw new Error('retry');
+        }
+      },
+      { retry: 1 },
+    );
+  });
+
+  assert.equal(attempts, 2);
+  assert.equal(beforeEachCount, 2);
+  assert.equal(afterEachCount, 2);
+  assert.equal(result.summary.passed, 1);
+});
+
+nodeTest('validates retry counts', () => {
+  resetRegistry();
+
+  assert.throws(() => it('negative', () => {}, { retry: -1 }), TypeError);
+  assert.throws(() => it('fractional', () => {}, { retry: 1.5 }), TypeError);
+  assert.throws(() => it.retry(-1), TypeError);
+});
+
+nodeTest('soft assertions record failures and continue the test', async () => {
+  const { expect } = await import('@guchho/test');
+  const order = [];
+
+  const result = await run(() => {
+    it('soft failures', () => {
+      expect.soft(1).toBe(2);
+      order.push('continued');
+      expect.soft('left').toBe('right');
+    });
+  });
+
+  assert.deepEqual(order, ['continued']);
+  assert.equal(result.summary.failed, 1);
+  assert.equal(result.results[0].error.name, 'SoftAssertionError');
+  assert.match(result.results[0].error.message, /Expected: 2/);
+  assert.match(result.results[0].error.message, /Expected: 'right'/);
+});
+
+nodeTest('soft assertions pass when every assertion passes', async () => {
+  const { expect } = await import('@guchho/test');
+
+  const result = await run(() => {
+    it('soft pass', () => {
+      expect.soft(2 + 2).toBe(4);
+      expect.soft({ id: 1 }).toEqual({ id: 1 });
+    });
+  });
+
+  assert.equal(result.summary.passed, 1);
+  assert.equal(result.results[0].error, undefined);
+});
