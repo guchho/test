@@ -87,6 +87,22 @@ describe('user', () => {
 });
 ```
 
+### Table-driven tests
+
+Generate tests from an array of argument arrays with `it.each`. Placeholders
+such as `%d`, `%s`, and `%#` are replaced per case.
+
+```js
+it.each([
+  [1, 1, 2],
+  [2, 3, 5],
+])('adds %d + %d', (left, right, expected) => {
+  expect(left + right).toBe(expected);
+});
+```
+
+`describe.each` generates suites in the same way.
+
 ### Asynchronous tests
 
 Return a promise from the test callback and the runner will await it.
@@ -152,11 +168,32 @@ describe('assertions', () => {
     expect('hello world').toMatch(/^hello/);
     expect([1, 2]).toHaveLength(2);
     expect(10).toBeGreaterThan(5);
+    expect(0.1 + 0.2).toBeCloseTo(0.3);
+    expect({ id: 1, name: 'Ada' }).toMatchObject({ id: 1 });
+    expect({ user: { tags: ['a', 'b'] } }).toHaveProperty('user.tags[0]', 'a');
     expect(null).toBeNull();
     expect(undefined).toBeUndefined();
   });
 });
 ```
+
+### Asymmetric matchers
+
+Use `expect.any`, `expect.objectContaining`, `expect.arrayContaining`, and
+friends inside other assertions:
+
+```js
+expect({ id: 1, name: 'Ada' }).toEqual({
+  id: expect.any(Number),
+  name: expect.stringContaining('Ad'),
+});
+
+expect({ id: 1, active: true }).toEqual(
+  expect.objectContaining({ active: true }),
+);
+```
+
+See [Assertions](./docs/assertions.md) for the full matcher list.
 
 ### Negation
 
