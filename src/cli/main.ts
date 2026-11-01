@@ -53,6 +53,8 @@ interface ExecutionOptions {
   readonly bail: boolean;
   readonly updateSnapshots: boolean;
   readonly coverage: boolean;
+  readonly setupFiles: readonly string[];
+  readonly setupFilesAfterEnv: readonly string[];
 }
 
 const emptySummary: RunSummary = {
@@ -182,6 +184,13 @@ async function executeFiles(
     pool: options.pool,
   });
 
+  const setupFiles = options.setupFiles.map((file) =>
+    path.resolve(io.cwd, file),
+  );
+  const setupFilesAfterEnv = options.setupFilesAfterEnv.map((file) =>
+    path.resolve(io.cwd, file),
+  );
+
   const tasks: WorkerInput[] = files.map((file) => ({
     file,
     timeout: options.timeout,
@@ -196,6 +205,8 @@ async function executeFiles(
     bail: options.bail,
     updateSnapshots: options.updateSnapshots,
     coverage: coverageConfig.enabled === true,
+    setupFiles,
+    setupFilesAfterEnv,
   }));
 
   let executionError = false;
@@ -373,6 +384,8 @@ function publishOutcome(
 function executionOptions(
   parsed: RunCommand,
   timeout: number,
+  setupFiles: readonly string[],
+  setupFilesAfterEnv: readonly string[],
 ): ExecutionOptions {
   return {
     filter: parsed.filter,
@@ -383,6 +396,8 @@ function executionOptions(
     bail: parsed.bail,
     updateSnapshots: parsed.updateSnapshots,
     coverage: parsed.coverage,
+    setupFiles,
+    setupFilesAfterEnv,
   };
 }
 
@@ -478,7 +493,12 @@ export async function main(
 
     const loaded = await loadConfig(io.cwd, parsed.config);
     const config = resolveConfig(loaded, { timeout: parsed.timeout });
-    const options = executionOptions(parsed, config.timeout);
+    const options = executionOptions(
+      parsed,
+      config.timeout,
+      config.setupFiles,
+      config.setupFilesAfterEnv,
+    );
     const entries = reporterEntries(parsed, config.reporters);
     const coverageConfig = parsed.coverage
       ? { ...config.coverage, enabled: true }
