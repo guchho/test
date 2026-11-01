@@ -589,6 +589,7 @@ guchho-test run --testNamePattern=^math   # regular expression filter
 guchho-test run --bail                    # stop after the first failure
 guchho-test run --maxWorkers=4            # run files in parallel
 guchho-test run --pool=forks              # use child processes instead of threads
+guchho-test run --shard=1/3               # run one shard of the test files
 guchho-test run --reporter=json           # machine-readable output
 guchho-test run --reporter=junit          # JUnit XML output
 guchho-test run --coverage                # collect V8 coverage
@@ -618,6 +619,19 @@ guchho-test run --testNamePattern "^user > validation"
 ```
 
 Filtered-out tests are not reported.
+
+### Sharding tests
+
+Split a run across CI jobs with `--shard=<index>/<count>`:
+
+```bash
+guchho-test run --shard=1/3
+guchho-test run --shard=2/3
+guchho-test run --shard=3/3
+```
+
+Files are assigned round-robin over the deterministic file list, so every file
+runs in exactly one shard. `--shard` cannot be combined with watch mode.
 
 ## Watch mode
 
