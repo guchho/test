@@ -75,6 +75,8 @@ test('validateConfig accepts a complete configuration', () => {
       timeout: 1000,
       reporters: ['default', ['json', { output: 'results.json' }]],
       plugins: ['./plugin.js'],
+      setupFiles: ['./setup.js'],
+      setupFilesAfterEnv: ['./setup-after.js'],
       coverage: {
         enabled: true,
         reportsDirectory: 'reports/coverage',
@@ -92,6 +94,8 @@ test('validateConfig accepts a complete configuration', () => {
     timeout: 1000,
     reporters: ['default', ['json', { output: 'results.json' }]],
     plugins: ['./plugin.js'],
+    setupFiles: ['./setup.js'],
+    setupFilesAfterEnv: ['./setup-after.js'],
     coverage: {
       enabled: true,
       reportsDirectory: 'reports/coverage',
@@ -140,6 +144,18 @@ test('validateConfig rejects unknown and malformed options', () => {
     /"plugins" must be an array of strings/,
   );
   assert.throws(
+    () => validateConfig({ setupFiles: 'setup.js' }, 'config.json'),
+    /"setupFiles" must be an array of strings/,
+  );
+  assert.throws(
+    () => validateConfig({ setupFiles: [''] }, 'config.json'),
+    /non-empty strings/,
+  );
+  assert.throws(
+    () => validateConfig({ setupFilesAfterEnv: [42] }, 'config.json'),
+    /"setupFilesAfterEnv" must only contain non-empty strings/,
+  );
+  assert.throws(
     () => validateConfig({ coverage: { thresholds: { lines: -1 } } }, 'config.json'),
     /coverage threshold "lines" must be a non-negative number/,
   );
@@ -164,6 +180,8 @@ test('resolveConfig applies defaults and config precedence', () => {
   assert.deepEqual([...defaults.reporters], ['default']);
   assert.equal(defaults.coverage.enabled, false);
   assert.deepEqual([...defaults.plugins], []);
+  assert.deepEqual([...defaults.setupFiles], []);
+  assert.deepEqual([...defaults.setupFilesAfterEnv], []);
   assert.equal(defaults.coverage.reportsDirectory, 'coverage');
 
   const configured = resolveConfig({
@@ -302,6 +320,77 @@ test('CLI timeout overrides configuration and defaults', async () => {
     const overridden = await runCli(['--timeout=1000'], { cwd: directory });
     assert.equal(overridden.code, 0, overridden.stderr);
     assert.match(overridden.stdout, /1 passed/);
+  });
+});
+
+test('runs setup files before the test file in both pools', async () => {
+  await withTempDirectory(async (directory) => {
+    await writeFile(
+      path.join(directory, 'setup.js'),
+      "globalThis.__guchhoSetupOrder = ['setup'];\n",
+    );
+    await writeFile(
+      path.join(directory, 'setup-after.js'),
+      "globalThis.__guchhoSetupOrder.push('setupAfterEnv');\n",
+    );
+    await writeFile(
+      path.join(directory, 'example.test.js'),
+      `import { expect, it } from ${JSON.stringify(distIndexUrl)};\n` +
+        "globalThis.__guchhoSetupOrder.push('test');\n" +
+        "it('sees setup files', () => {\n" +
+        '  expect(globalThis.__guchhoSetupOrder).toEqual([\n' +
+        "    'setup',\n" +
+        "    'setupAfterEnv',\n" +
+        "    'test',\n" +
+        '  ]);\n' +
+        '});\n',
+    );
+    await writeFile(
+      path.join(directory, 'guchho.test.config.json'),
+      JSON.stringify({
+        setupFiles: ['./setup.js'],
+        setupFilesAfterEnv: ['./setup-after.js'],
+      }),
+    );
+
+    for (const pool of ['threads', 'forks']) {
+      const result = await runCli([`--pool=${pool}`], { cwd: directory });
+      assert.equal(
+        result.code,
+        0,
+        `${pool}: ${result.stderr}${result.stdout}`,
+      );
+      assert.match(result.stdout, /✓ sees setup files/);
+    }
+  });
+});
+
+test('reports setup file failures with exit code 2', async () => {
+  await withTempDirectory(async (directory) => {
+    await writeFile(
+      path.join(directory, 'example.test.js'),
+      testFileSource('never runs'),
+    );
+
+    for (const [key, file] of [
+      ['setupFiles', 'setup.js'],
+      ['setupFilesAfterEnv', 'setup-after.js'],
+    ]) {
+      await writeFile(
+        path.join(directory, file),
+        `throw new Error('${key} boom');\n`,
+      );
+      await writeFile(
+        path.join(directory, 'guchho.test.config.json'),
+        JSON.stringify({ [key]: [`./${file}`] }),
+      );
+
+      const result = await runCli([], { cwd: directory });
+      assert.equal(result.code, 2);
+      assert.match(result.stderr, /Failed to load setup/);
+      assert.match(result.stderr, new RegExp(`${key} boom`));
+      assert.doesNotMatch(result.stdout, /never runs/);
+    }
   });
 });
 
