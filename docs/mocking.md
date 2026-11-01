@@ -118,6 +118,36 @@ expect(Ctor.mock.instances[0]).toBe(instance);
 
 For a `spyOn` constructor, `new` delegates to the original constructor.
 
+## Mock matchers
+
+Mock assertions support call history and return values:
+
+```js
+const fn = mock.fn((value) => value * 2);
+fn(1);
+fn(2);
+
+expect(fn).toHaveBeenCalled();
+expect(fn).toHaveBeenCalledTimes(2);
+expect(fn).toHaveBeenCalledWith(1);
+expect(fn).toHaveBeenLastCalledWith(2);
+expect(fn).toHaveBeenNthCalledWith(1, 1);
+expect(fn).toHaveReturned();
+expect(fn).toHaveReturnedWith(4);
+expect(fn).toHaveReturnedTimes(2);
+```
+
+Call arguments use deep equality, so asymmetric matchers work:
+
+```js
+fn({ id: 1, name: 'Ada' });
+expect(fn).toHaveBeenLastCalledWith(
+  expect.objectContaining({ id: expect.any(Number) }),
+);
+```
+
+See [Assertions](./assertions.md#mock-matchers) for the complete matcher list.
+
 ## Module mocking
 
 `mock.module(specifier, factory)` replaces an ESM module for subsequent dynamic
