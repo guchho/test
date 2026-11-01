@@ -31,6 +31,52 @@ describe('user', () => {
 });
 ```
 
+## Table-driven tests
+
+`it.each` and `describe.each` generate tests or suites from an array of argument
+arrays. Placeholders in the title are replaced per case.
+
+```js
+import { describe, it, expect } from '@guchho/test';
+
+it.each([
+  [1, 1, 2],
+  [2, 3, 5],
+  [0, 0, 0],
+])('adds %d + %d', (left, right, expected) => {
+  expect(left + right).toBe(expected);
+});
+```
+
+`describe.each` passes the values to the suite callback:
+
+```js
+describe.each([
+  ['admin', ['read', 'write']],
+  ['viewer', ['read']],
+])('%s permissions', (role, permissions) => {
+  it('exposes the expected permissions', () => {
+    expect(getPermissions(role)).toEqual(permissions);
+  });
+});
+```
+
+Supported placeholders:
+
+| Placeholder | Value |
+|---|---|
+| `%s` | String value. |
+| `%d`, `%i` | Integer value. |
+| `%f` | Numeric value. |
+| `%j` | JSON value. |
+| `%o` | Inspected object value. |
+| `%#` | Zero-based case index. |
+| `%%` | Literal `%`. |
+
+A title with more placeholders than a case provides throws a `TypeError`. Object
+and tagged-template case forms are not implemented yet; see
+[`ROADMAP.md`](../ROADMAP.md).
+
 ## Synchronous and asynchronous tests
 
 A test may return a promise. The runner awaits it and applies the per-test
