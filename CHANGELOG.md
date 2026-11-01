@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Setup modules through `setupFiles` and `setupFilesAfterEnv`, run in order
   before each test file with clear failures for missing or throwing modules.
+- Project-level `globalSetup` and `globalTeardown` hooks that run once per test
+  run in the main process.
+- `--shard=<index>/<count>` to split test files deterministically across CI
+  jobs.
 - Soft assertions with `expect.soft`.
 - Polling assertions with `expect.poll`.
 
