@@ -408,6 +408,104 @@ test('reports setup file failures with exit code 2', async () => {
   });
 });
 
+test('runs global setup and teardown around the test run', async () => {
+  await withTempDirectory(async (directory) => {
+    const marker = path.join(directory, 'global-teardown.txt');
+
+    await writeFile(
+      path.join(directory, 'global-setup.js'),
+      'export default function setup() {\n' +
+        "  process.env.GUCHHO_GLOBAL_SETUP = 'ready';\n" +
+        '}\n',
+    );
+    await writeFile(
+      path.join(directory, 'global-teardown.js'),
+      "import { writeFileSync } from 'node:fs';\n" +
+        'export function teardown() {\n' +
+        `  writeFileSync(${JSON.stringify(marker)}, 'done');\n` +
+        '}\n',
+    );
+    await writeFile(
+      path.join(directory, 'example.test.js'),
+      `import { expect, it } from ${JSON.stringify(distIndexUrl)};\n` +
+        "it('sees global setup', () => {\n" +
+        "  expect(process.env.GUCHHO_GLOBAL_SETUP).toBe('ready');\n" +
+        '});\n',
+    );
+    await writeFile(
+      path.join(directory, 'guchho.test.config.json'),
+      JSON.stringify({
+        globalSetup: './global-setup.js',
+        globalTeardown: './global-teardown.js',
+      }),
+    );
+
+    for (const pool of ['threads', 'forks']) {
+      const result = await runCli([`--pool=${pool}`], { cwd: directory });
+      assert.equal(
+        result.code,
+        0,
+        `${pool}: ${result.stderr}${result.stdout}`,
+      );
+      assert.match(result.stdout, /✓ sees global setup/);
+      assert.equal(await readFile(marker, 'utf8'), 'done');
+      await rm(marker, { force: true });
+    }
+  });
+});
+
+test('reports global setup and teardown failures', async () => {
+  await withTempDirectory(async (directory) => {
+    await writeFile(
+      path.join(directory, 'example.test.js'),
+      testFileSource('runs anyway'),
+    );
+
+    await writeFile(
+      path.join(directory, 'global-setup.js'),
+      "throw new Error('global setup boom');\n",
+    );
+    await writeFile(
+      path.join(directory, 'guchho.test.config.json'),
+      JSON.stringify({ globalSetup: './global-setup.js' }),
+    );
+
+    const setup = await runCli([], { cwd: directory });
+    assert.equal(setup.code, 2);
+    assert.match(setup.stderr, /Failed to run globalSetup/);
+    assert.match(setup.stderr, /global setup boom/);
+    assert.doesNotMatch(setup.stdout, /runs anyway/);
+
+    await writeFile(
+      path.join(directory, 'global-teardown.js'),
+      "throw new Error('global teardown boom');\n",
+    );
+    await writeFile(
+      path.join(directory, 'guchho.test.config.json'),
+      JSON.stringify({ globalTeardown: './global-teardown.js' }),
+    );
+
+    const teardown = await runCli([], { cwd: directory });
+    assert.equal(teardown.code, 2);
+    assert.match(teardown.stdout, /✓ runs anyway/);
+    assert.match(teardown.stderr, /Failed to run globalTeardown/);
+    assert.match(teardown.stderr, /global teardown boom/);
+
+    await writeFile(
+      path.join(directory, 'global-setup.js'),
+      'export const notAHook = true;\n',
+    );
+    await writeFile(
+      path.join(directory, 'guchho.test.config.json'),
+      JSON.stringify({ globalSetup: './global-setup.js' }),
+    );
+
+    const invalid = await runCli([], { cwd: directory });
+    assert.equal(invalid.code, 2);
+    assert.match(invalid.stderr, /globalSetup module .* must export a function/);
+  });
+});
+
 test('reports configuration errors with exit code 2', async () => {
   await withTempDirectory(async (directory) => {
     await writeFile(
