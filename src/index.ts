@@ -13,6 +13,8 @@ export type {
   MatcherResult,
   Matchers,
   MatcherUtils,
+  PollExpectation,
+  PollOptions,
 } from './expect/expect.js';
 export type {
   AsymmetricMatcher,
@@ -33,6 +35,7 @@ export {
   beforeAll,
   beforeEach,
   describe,
+  fails,
   it,
   only,
   skip,
@@ -41,10 +44,13 @@ export {
   todo,
 } from './runner/registry.js';
 export type {
+  ConditionalTestApi,
   DescribeApi,
   EachCase,
   EachDescribe,
   EachTest,
+  RetryTestApi,
+  RetryTestRegistrar,
   TestApi,
 } from './runner/registry.js';
 export type {
@@ -60,6 +66,7 @@ export type {
   TestDefinition,
   TestFunction,
   TestMode,
+  TestOptions,
   TestResult,
   TestStatus,
 } from './runner/types.js';
