@@ -1,6 +1,7 @@
 export { defineConfig } from './config/define-config.js';
 export { expect } from './expect/expect.js';
 export type {
+  AsymmetricMatchers,
   AsyncExpectation,
   AsyncMatchers,
   EqualityTest,
@@ -13,6 +14,10 @@ export type {
   Matchers,
   MatcherUtils,
 } from './expect/expect.js';
+export type {
+  AsymmetricMatcher,
+  Equals,
+} from './expect/asymmetric.js';
 export { AssertionError } from './expect/errors.js';
 export type {
   CoverageConfig,
@@ -37,6 +42,9 @@ export {
 } from './runner/registry.js';
 export type {
   DescribeApi,
+  EachCase,
+  EachDescribe,
+  EachTest,
   TestApi,
 } from './runner/registry.js';
 export type {
