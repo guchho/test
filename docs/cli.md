@@ -36,6 +36,8 @@ command. Only one command may be selected.
 | `--bail` | Stop after the first failure. Forces a single worker. |
 | `--maxWorkers <count>` | Run files in parallel using up to `count` workers. |
 | `--pool <name>` | Execution pool: `threads` (default) or `forks`. |
+| `--shard <index>/<count>` | Run only the given shard of selected test files. |
+| `--shard=<index>/<count>` | Same as above in `=` form. |
 | `-h`, `--help` | Show help. |
 | `-v`, `--version` | Show the installed version. |
 | `--` | Treat remaining arguments as file paths. |
@@ -53,6 +55,7 @@ guchho-test run --testNamePattern=^math       # regex filter
 guchho-test run --bail                        # stop at first failure
 guchho-test run --maxWorkers=4                # up to four parallel workers
 guchho-test run --pool=forks                  # use child processes
+guchho-test run --shard=1/3                   # first third of selected files
 guchho-test run --reporter=json               # JSON output
 guchho-test run --reporter=junit              # JUnit XML output
 guchho-test run --coverage                    # V8 coverage
@@ -67,6 +70,20 @@ paths are removed.
 
 When no files are provided, test files are discovered using the configured
 `include`/`exclude` patterns and sorted for deterministic execution.
+
+## Sharding
+
+`--shard=<index>/<count>` runs a deterministic subset of the selected test files,
+which is useful for splitting a run across CI jobs. Both numbers must be positive
+integers and `1 <= index <= count`.
+
+Shards are assigned round-robin over the file list, so every file runs in exactly
+one shard and shards are balanced. For example, with `--shard=1/2` and files
+`a`, `b`, `c`, `d`, the first shard runs `a` and `c`, and the second runs `b`
+and `d`. Run all shards together to cover the full suite.
+
+`--shard` cannot be combined with watch mode. A shard that selects no files exits
+with code `2` and prints a message to stderr.
 
 ## Exit codes
 
