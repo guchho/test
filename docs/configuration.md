@@ -29,6 +29,8 @@ export default defineConfig({
   reporters: ['default'],
   setupFiles: ['./tests/setup.js'],
   setupFilesAfterEnv: ['./tests/setup-after-env.js'],
+  globalSetup: './tests/global-setup.js',
+  globalTeardown: './tests/global-teardown.js',
   coverage: {
     enabled: false,
     reporter: ['text', 'html'],
@@ -62,6 +64,8 @@ build step is required.
 | `plugins` | `string[]` | Paths to plugin modules, resolved from the working directory. |
 | `setupFiles` | `string[]` | Modules to load before `setupFilesAfterEnv` and the test file, resolved from the working directory. |
 | `setupFilesAfterEnv` | `string[]` | Modules to load after `setupFiles` and before the test file, resolved from the working directory. |
+| `globalSetup` | `string` | Module run once before the test files, resolved from the working directory. |
+| `globalTeardown` | `string` | Module run once after the test files, resolved from the working directory. |
 | `coverage` | `CoverageConfig` | Coverage options. |
 
 Unknown top-level options are rejected.
@@ -85,6 +89,33 @@ setupFilesAfterEnv: ['./tests/setup-matchers.js'];
 
 A setup module that throws, or cannot be loaded, aborts that test file and exits
 with code `2`. The error identifies the failing setup file.
+
+### `globalSetup` and `globalTeardown`
+
+These run once per test run in the main process, rather than once per test file:
+
+1. `globalSetup` runs before any test file is executed.
+2. `globalTeardown` runs after all test files finish, including when a test file
+   fails.
+
+```js
+// tests/global-setup.js
+export default async function setup({ cwd }) {
+  await startDatabase(cwd);
+}
+
+// tests/global-teardown.js
+export async function teardown({ cwd }) {
+  await stopDatabase(cwd);
+}
+```
+
+The module may export a function as `default`, or under the matching hook name
+(`setup` or `teardown`). The function receives `{ cwd }` and may be synchronous
+or return a promise. A failure in either hook prints its error and exits with
+code `2`; a `globalSetup` failure prevents the test files from running.
+
+In watch mode both hooks run again for each rerun.
 
 ### `reporters`
 
@@ -145,6 +176,8 @@ Default coverage exclude:
 | `plugins` | `[]` |
 | `setupFiles` | `[]` |
 | `setupFilesAfterEnv` | `[]` |
+| `globalSetup` | none |
+| `globalTeardown` | none |
 
 ## Precedence
 
