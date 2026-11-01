@@ -37,7 +37,7 @@ import { watchTests } from '../watch/watcher.js';
 import { discoverTestFiles } from './discovery.js';
 import { helpText } from './help.js';
 import { CliError, parseArgs } from './parser.js';
-import type { RunCommand } from './parser.js';
+import type { RunCommand, ShardOptions } from './parser.js';
 
 interface CliIO {
   readonly cwd: string;
@@ -186,6 +186,19 @@ async function resolveExplicitFiles(
   }
 
   return resolved;
+}
+
+function applyShard(
+  files: readonly string[],
+  shard: ShardOptions | undefined,
+): string[] {
+  if (shard === undefined) {
+    return [...files];
+  }
+
+  return files.filter(
+    (_, index) => index % shard.count === shard.index - 1,
+  );
 }
 
 async function resolveFiles(
@@ -596,8 +609,17 @@ export async function main(
       return 2;
     }
 
+    const selectedFiles = applyShard(files, parsed.shard);
+
+    if (parsed.shard !== undefined && selectedFiles.length === 0) {
+      io.stderr(
+        `guchho-test: Shard ${parsed.shard.index}/${parsed.shard.count} selected no test files.\n`,
+      );
+      return 2;
+    }
+
     return await executeFiles(
-      files,
+      selectedFiles,
       options,
       entries,
       coverageConfig,
