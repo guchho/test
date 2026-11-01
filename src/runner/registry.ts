@@ -1,3 +1,4 @@
+import { assertEachCases, formatEachTitle } from './each.js';
 import type {
   HookFunction,
   HookType,
@@ -126,10 +127,84 @@ function registerHook(type: HookType, fn: HookFunction): void {
   currentSuite.hooks[type].push(fn);
 }
 
+type EachArguments = readonly unknown[];
+
+type EachTestFunction = (...args: unknown[]) => void | Promise<unknown>;
+
+function registerEachTests(
+  cases: unknown,
+  name: string,
+  fn: EachTestFunction,
+  timeout: number | undefined,
+  mode: TestMode,
+): void {
+  assertEachCases(cases);
+  assertName(name, 'test');
+  assertFunction(fn, 'test');
+  assertTimeout(timeout);
+
+  for (let index = 0; index < cases.length; index += 1) {
+    const args = cases[index];
+    if (args === undefined) {
+      continue;
+    }
+
+    registerTest(
+      formatEachTitle(name, args, index),
+      () => fn(...args),
+      mode,
+      timeout,
+    );
+  }
+}
+
+function registerEachSuites(
+  cases: unknown,
+  name: string,
+  fn: EachTestFunction,
+  mode: Exclude<TestMode, 'todo'>,
+): void {
+  assertEachCases(cases);
+  assertName(name, 'suite');
+  assertFunction(fn, 'suite');
+
+  for (let index = 0; index < cases.length; index += 1) {
+    const args = cases[index];
+    if (args === undefined) {
+      continue;
+    }
+
+    registerSuite(
+      formatEachTitle(name, args, index),
+      () => {
+        void fn(...args);
+      },
+      mode,
+    );
+  }
+}
+
+export interface EachTest {
+  <TArgs extends EachArguments>(
+    cases: readonly TArgs[],
+  ): (
+    name: string,
+    fn: (...args: TArgs) => void | Promise<unknown>,
+    timeout?: number,
+  ) => void;
+}
+
+export interface EachDescribe {
+  <TArgs extends EachArguments>(
+    cases: readonly TArgs[],
+  ): (name: string, fn: (...args: TArgs) => void) => void;
+}
+
 export interface DescribeApi {
   (name: string, fn: () => void): void;
   skip(name: string, fn: () => void): void;
   only(name: string, fn: () => void): void;
+  each: EachDescribe;
 }
 
 export interface TestApi {
@@ -137,7 +212,35 @@ export interface TestApi {
   skip(name: string, fn?: TestFunction, timeout?: number): void;
   only(name: string, fn?: TestFunction, timeout?: number): void;
   todo(name: string): void;
+  each: EachTest;
 }
+
+const eachDescribe: EachDescribe = <TArgs extends EachArguments>(
+  cases: readonly TArgs[],
+) => {
+  return (name, fn): void => {
+    registerEachSuites(
+      cases,
+      name,
+      fn as unknown as (...args: unknown[]) => void,
+      'normal',
+    );
+  };
+};
+
+const eachTest: EachTest = <TArgs extends EachArguments>(
+  cases: readonly TArgs[],
+) => {
+  return (name, fn, timeout): void => {
+    registerEachTests(
+      cases,
+      name,
+      fn as unknown as (...args: unknown[]) => void | Promise<unknown>,
+      timeout,
+      'normal',
+    );
+  };
+};
 
 export const describe: DescribeApi = Object.assign(
   (name: string, fn: () => void): void => {
@@ -150,6 +253,7 @@ export const describe: DescribeApi = Object.assign(
     only: (name: string, fn: () => void): void => {
       registerSuite(name, fn, 'only');
     },
+    each: eachDescribe,
   },
 );
 
@@ -169,6 +273,7 @@ export const it: TestApi = Object.assign(
     todo: (name: string): void => {
       registerTest(name, undefined, 'todo');
     },
+    each: eachTest,
   },
 );
 
@@ -236,6 +341,7 @@ function countTests(suite: SuiteDefinition): number {
   return count;
 }
 
+export type { EachCase } from './each.js';
 export type { TestDefinition };
 
 reset();
