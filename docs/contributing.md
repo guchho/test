@@ -11,13 +11,15 @@ src/
   mock/         mock functions, spies, module mocking, loader
   plugins/      plugin types and loading
   reporters/    built-in reporters and reporter types
-  runner/       registry, executor, worker pool, serialization
+  runner/       registry, table tests, executor, worker pool, serialization
   snapshot/     snapshot session, serialization, inline updates
   transform/    TypeScript/JSX loader and transformation
   utils/        glob matching
   watch/        watcher and dependency tracking
 tests/          Node.js test-runner suites and fixtures
 docs/           documentation
+ROADMAP.md      planned features and the release checklist
+CHANGELOG.md    released and unreleased changes
 ```
 
 ## Setup
@@ -43,7 +45,7 @@ npm install
 3. Run `npm run typecheck` and `npm test`.
 4. Update documentation for any user-facing behavior change.
 5. Update `CHANGELOG.md` under `[Unreleased]`.
-6. Update `TODO.md` when completing planned phases or items.
+6. Update `ROADMAP.md` when completing planned phases or items.
 
 Do not commit unintended build output or unrelated changes.
 
@@ -90,7 +92,7 @@ examples. When behavior changes:
 ## Release
 
 Releases are cut only with explicit approval. The release checklist lives in
-`TODO.md` and includes version bumps, changelog preparation, a full verification
-pass, CI validation, and a package content audit.
+[`ROADMAP.md`](../ROADMAP.md) and includes version bumps, changelog preparation, a
+full verification pass, CI validation, and a package content audit.
 
 Do not publish to npm or create a public release without permission.
