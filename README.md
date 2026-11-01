@@ -150,6 +150,72 @@ it.todo('write this later');
 When any `only` test exists, tests that are not focused directly or through an
 ancestor suite are reported as skipped.
 
+### Conditional tests
+
+`it.runIf` runs a test only when its condition is `true`; `it.skipIf` runs it
+only when the condition is `false`. Both support `.each`.
+
+```js
+it.runIf(process.platform === 'win32')('uses Windows paths', () => {
+  expect(path.join('a', 'b')).toBe('a\\b');
+});
+
+it.skipIf(process.env.CI === 'true')('runs locally only', () => {});
+```
+
+### Retries
+
+Retry a flaky test with the `retry` option or the `it.retry` modifier:
+
+```js
+it('eventually succeeds', async () => {
+  await flakyOperation();
+}, { retry: 2 });
+
+it.retry(2)('also retries twice', async () => {
+  await flakyOperation();
+});
+```
+
+Each attempt reruns the test cycle, including `beforeEach` and `afterEach`.
+`beforeAll` and `afterAll` still run once per suite.
+
+### Concurrent tests
+
+Use `it.concurrent` to run tests in parallel with other concurrent tests in the
+same suite:
+
+```js
+it.concurrent('fetches the first user', async () => {
+  await loadUser(1);
+});
+
+it.concurrent('fetches the second user', async () => {
+  await loadUser(2);
+});
+```
+
+`describe.concurrent` marks every test in a suite, including nested suites, as
+concurrent:
+
+```js
+describe.concurrent('api', () => {
+  it('reads', async () => {
+    await request('/read');
+  });
+
+  it('writes', async () => {
+    await request('/write');
+  });
+});
+```
+
+Concurrent tests run in batches. A regular test waits for the preceding batch to
+finish before it starts. `beforeEach` and `afterEach` run around each test, while
+`beforeAll` and `afterAll` run once per suite. Results are reported in
+registration order regardless of completion order. Avoid sharing mutable state
+between concurrent tests unless you provide your own synchronization.
+
 ## Assertions
 
 Import `expect` from `@guchho/test`. A failed assertion throws an
