@@ -68,7 +68,35 @@ async function execute(input: WorkerInput): Promise<WorkerOutcome> {
   return outcome;
 }
 
+async function loadSetupFiles(
+  files: readonly string[],
+  label: string,
+): Promise<void> {
+  for (const file of files) {
+    try {
+      await import(pathToFileURL(file).href);
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? (error.stack ?? error.message)
+          : serializeError(error).inspected;
+      throw new Error(`Failed to load ${label} "${file}":\n${detail}`);
+    }
+  }
+}
+
 async function runTests(input: WorkerInput): Promise<WorkerOutcome> {
+  try {
+    await loadSetupFiles(input.setupFiles, 'setup file');
+    await loadSetupFiles(input.setupFilesAfterEnv, 'setupFilesAfterEnv entry');
+  } catch (error) {
+    return {
+      kind: 'failure',
+      file: input.file,
+      message: serializeError(error).inspected,
+    };
+  }
+
   try {
     await import(pathToFileURL(input.file).href);
   } catch (error) {
