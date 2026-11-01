@@ -39,21 +39,25 @@ Alias of `describe`.
 
 Registers a skipped or focused suite.
 
-### `it(name, fn?, timeout?)`
+### `describe.concurrent(name, fn)`
 
-Registers a test. `fn` may be synchronous or return a promise. `timeout`
-overrides the default per-test timeout in milliseconds and must be a positive
-finite number.
+Registers a suite whose tests, including tests in nested suites, run in parallel.
+`describe.concurrent.each` generates concurrent suites from table cases.
 
-### `test(name, fn?, timeout?)`
+### `it(name, fn?, options?)`
+
+Registers a test. `fn` may be synchronous or return a promise. `options` may be
+a timeout number or a `TestOptions` object. See [TestOptions](#testoptions).
+
+### `test(name, fn?, options?)`
 
 Alias of `it`.
 
-### `it.skip(name, fn?, timeout?)`
+### `it.skip(name, fn?, options?)`
 
 Registers a skipped test. The callback is optional.
 
-### `it.only(name, fn?, timeout?)`
+### `it.only(name, fn?, options?)`
 
 Registers a focused test.
 
@@ -61,11 +65,51 @@ Registers a focused test.
 
 Registers a todo test with no callback.
 
-### `skip(name, fn?, timeout?)`
+### `it.concurrent(name, fn?, options?)`
+
+Registers a test that runs in parallel with other concurrent tests in the same
+suite. `it.concurrent.each` generates concurrent tests from table cases.
+
+### `it.fails(name, fn?, options?)`
+
+Registers a test that passes only when its callback fails. `it.fails.each`
+generates failing tests from table cases.
+
+### `it.runIf(condition)` / `it.skipIf(condition)`
+
+Returns a test registrar that runs or skips based on `condition`. The returned
+registrar supports `.each`.
+
+### `it.retry(retries, name, fn?, options?)` / `it.retry(retries)`
+
+Registers a test that is retried up to `retries` times. The curried form returns
+a registrar that supports `.each`:
+
+```js
+it.retry('flaky', loadUser, 2);
+it.retry(2)('flaky', loadUser);
+```
+
+Each attempt reruns `beforeEach` and `afterEach`; `beforeAll` and `afterAll` run
+once per suite.
+
+### Test options
+
+```ts
+interface TestOptions {
+  timeout?: number;
+  retry?: number;
+}
+```
+
+`timeout` is a positive, finite number of milliseconds. `retry` is a
+non-negative integer.
+
+### `skip(name, fn?, options?)`
 
 Standalone function equivalent to `it.skip`.
 
-### `only(name, fn?, timeout?)`
+### `only(name, fn?, options?)`
 
 Standalone function equivalent to `it.only`.
 
@@ -80,9 +124,11 @@ interface DescribeApi {
   (name: string, fn: () => void): void;
   skip(name: string, fn: () => void): void;
   only(name: string, fn: () => void): void;
-  each<TArgs extends readonly unknown[]>(
-    cases: readonly TArgs[],
-  ): (name: string, fn: (...args: TArgs) => void) => void;
+  concurrent: {
+    (name: string, fn: () => void): void;
+    each: EachDescribe;
+  };
+  each: EachDescribe;
 }
 ```
 
@@ -90,17 +136,37 @@ interface DescribeApi {
 
 ```ts
 interface TestApi {
-  (name: string, fn?: () => void | Promise<unknown>, timeout?: number): void;
-  skip(name: string, fn?: () => void | Promise<unknown>, timeout?: number): void;
-  only(name: string, fn?: () => void | Promise<unknown>, timeout?: number): void;
+  (name: string, fn?: () => void | Promise<unknown>, options?: number | TestOptions): void;
+  skip(name: string, fn?: () => void | Promise<unknown>, options?: number | TestOptions): void;
+  only(name: string, fn?: () => void | Promise<unknown>, options?: number | TestOptions): void;
   todo(name: string): void;
-  each<TArgs extends readonly unknown[]>(
-    cases: readonly TArgs[],
-  ): (
-    name: string,
-    fn: (...args: TArgs) => void | Promise<unknown>,
-    timeout?: number,
-  ) => void;
+  fails: {
+    (name: string, fn?: () => void | Promise<unknown>, options?: number | TestOptions): void;
+    each: EachTest;
+  };
+  concurrent: {
+    (name: string, fn?: () => void | Promise<unknown>, options?: number | TestOptions): void;
+    each: EachTest;
+  };
+  runIf(condition: boolean): ConditionalTestApi;
+  skipIf(condition: boolean): ConditionalTestApi;
+  retry: RetryTestApi;
+  each: EachTest;
+}
+
+interface ConditionalTestApi {
+  (name: string, fn?: () => void | Promise<unknown>, options?: number | TestOptions): void;
+  each: EachTest;
+}
+
+interface RetryTestApi {
+  (name: string, fn?: () => void | Promise<unknown>, retries?: number, options?: number | TestOptions): void;
+  (retries: number): RetryTestRegistrar;
+}
+
+interface RetryTestRegistrar {
+  (name: string, fn?: () => void | Promise<unknown>, options?: number | TestOptions): void;
+  each: EachTest;
 }
 ```
 
@@ -130,6 +196,8 @@ Hooks may return a promise. See [Lifecycle Hooks](./lifecycle-hooks.md).
 
 ```ts
 expect(actual): Expectation
+expect.soft(actual): Expectation
+expect.poll(callback, options?): PollExpectation
 expect.extend(matchers): void
 expect.addEqualityTest(test): () => void
 expect.any(Constructor): AsymmetricMatcher
@@ -144,6 +212,19 @@ expect.closeTo(number, digits?): AsymmetricMatcher
 ### `expect(actual)`
 
 Returns an expectation with all matchers, plus `not`, `resolves`, and `rejects`.
+
+### `expect.soft(actual)`
+
+Returns an expectation that records assertion failures instead of throwing, so
+the rest of the test runs. The test fails once it finishes. Supports the same
+matchers and modifiers as `expect(actual)`.
+
+### `expect.poll(callback, options?)`
+
+Retries a matcher against the callback result until it passes or the timeout
+elapses. `options.timeout` defaults to `1000` ms and `options.interval` to `50`
+ms. The callback may be synchronous or asynchronous. See
+[Assertions](./assertions.md#polling-assertions).
 
 ### `expect.any` and other asymmetric matchers
 
