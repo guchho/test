@@ -40,6 +40,10 @@ const knownConfigKeys = new Set([
   'timeout',
   'reporters',
   'plugins',
+  'setupFiles',
+  'setupFilesAfterEnv',
+  'globalSetup',
+  'globalTeardown',
   'coverage',
 ]);
 
@@ -75,6 +79,10 @@ export interface ResolvedConfig {
   readonly timeout: number;
   readonly reporters: readonly ReporterEntry[];
   readonly plugins: readonly string[];
+  readonly setupFiles: readonly string[];
+  readonly setupFilesAfterEnv: readonly string[];
+  readonly globalSetup: string | undefined;
+  readonly globalTeardown: string | undefined;
   readonly coverage: Readonly<CoverageConfig>;
 }
 
@@ -120,6 +128,18 @@ function validateStringArray(
 
     return entry;
   });
+}
+
+function validateNonEmptyString(
+  value: unknown,
+  source: string,
+  key: string,
+): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new ConfigError(`${source}: "${key}" must be a non-empty string.`);
+  }
+
+  return value;
 }
 
 function validateTimeout(value: unknown, source: string): number {
@@ -335,6 +355,38 @@ export function validateConfig(value: unknown, source: string): GuchhoConfig {
     result.plugins = validateStringArray(config.plugins, source, 'plugins');
   }
 
+  if (config.setupFiles !== undefined) {
+    result.setupFiles = validateStringArray(
+      config.setupFiles,
+      source,
+      'setupFiles',
+    );
+  }
+
+  if (config.setupFilesAfterEnv !== undefined) {
+    result.setupFilesAfterEnv = validateStringArray(
+      config.setupFilesAfterEnv,
+      source,
+      'setupFilesAfterEnv',
+    );
+  }
+
+  if (config.globalSetup !== undefined) {
+    result.globalSetup = validateNonEmptyString(
+      config.globalSetup,
+      source,
+      'globalSetup',
+    );
+  }
+
+  if (config.globalTeardown !== undefined) {
+    result.globalTeardown = validateNonEmptyString(
+      config.globalTeardown,
+      source,
+      'globalTeardown',
+    );
+  }
+
   if (config.reporters !== undefined) {
     result.reporters = validateReporters(
       config.reporters,
@@ -463,6 +515,10 @@ export function resolveConfig(
     timeout: overrides.timeout ?? config?.timeout ?? defaultTimeout,
     reporters: config?.reporters ?? [...(defaultConfig.reporters ?? [])],
     plugins: config?.plugins ?? [],
+    setupFiles: config?.setupFiles ?? [],
+    setupFilesAfterEnv: config?.setupFilesAfterEnv ?? [],
+    globalSetup: config?.globalSetup,
+    globalTeardown: config?.globalTeardown,
     coverage: resolvedCoverage,
   };
 }
