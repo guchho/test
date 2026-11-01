@@ -18,6 +18,8 @@ Options:
   --bail               Stop after the first failure
   --maxWorkers <count> Run test files in parallel using up to count workers
   --pool <name>        Select the execution pool: threads, forks
+  --shard <index>/<count>
+                       Run only the given shard of selected test files
   -h, --help           Show this help message
   -v, --version        Show the installed version
 
