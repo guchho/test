@@ -2,6 +2,10 @@ import { performance } from 'node:perf_hooks';
 
 import { defaultTimeout } from '../config/defaults.js';
 import {
+  resetSoftAssertions,
+  takeSoftAssertions,
+} from '../expect/expect.js';
+import {
   beginSnapshotTest,
   endSnapshotTest,
 } from '../snapshot/session.js';
@@ -138,6 +142,20 @@ function createResult(
   };
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function createSoftAssertionError(errors: readonly Error[]): Error {
+  const error = new Error(errors.map(errorMessage).join('\n\n'));
+  error.name = 'SoftAssertionError';
+  return error;
+}
+
+function combineErrors(first: unknown, second: unknown): Error {
+  return new Error(`${errorMessage(first)}\n\n${errorMessage(second)}`);
+}
+
 async function executeTest(
   test: TestDefinition,
   defaultTestTimeout: number,
@@ -149,11 +167,18 @@ async function executeTest(
 
   const timeout = test.timeout ?? defaultTestTimeout;
   const start = performance.now();
+  const isFails = (test as any).mode === 'fails';
 
   try {
     await runWithTimeout(test.fn, timeout, `Test "${test.fullName}"`);
+    if (isFails) {
+      return createResult(test, 'failed', performance.now() - start, new Error('Expected test to fail but it passed.'));
+    }
     return createResult(test, 'passed', performance.now() - start, undefined);
   } catch (error) {
+    if (isFails) {
+      return createResult(test, 'passed', performance.now() - start, undefined);
+    }
     return createResult(test, 'failed', performance.now() - start, error);
   }
 }
@@ -170,6 +195,13 @@ function resolveStatus(
 
   if (test.mode === 'todo' || test.fn === undefined) {
     return 'todo';
+  }
+
+  if ((test as any).mode === 'fails' || (test as any).mode === 'concurrent') {
+    if (hasOnly && !ancestorOnly && test.mode !== 'only') {
+      return 'skipped';
+    }
+    return 'passed';
   }
 
   if (hasOnly && !ancestorOnly && test.mode !== 'only') {
@@ -224,26 +256,52 @@ function recordResult(result: TestResult, state: ExecutionState): void {
   }
 }
 
-async function runHook(
+interface HookOutcome {
+  readonly passed: boolean;
+  readonly error: unknown;
+}
+
+async function invokeHook(
   type: HookType,
   suite: SuiteDefinition,
   fn: HookFunction,
   state: ExecutionState,
-): Promise<boolean> {
+): Promise<HookOutcome> {
   try {
     await runWithTimeout(
       fn,
       state.timeout,
       `Hook "${type}" in "${suiteLabel(suite)}"`,
     );
-    return true;
+    return { passed: true, error: undefined };
   } catch (error) {
-    state.errors.push({ type, suite: suiteLabel(suite), error });
-    if (state.bail) {
-      state.bailed = true;
-    }
-    return false;
+    return { passed: false, error };
   }
+}
+
+function recordHookFailure(
+  type: HookType,
+  suite: SuiteDefinition,
+  error: unknown,
+  state: ExecutionState,
+): void {
+  state.errors.push({ type, suite: suiteLabel(suite), error });
+  if (state.bail) {
+    state.bailed = true;
+  }
+}
+
+async function runHook(
+  type: HookType,
+  suite: SuiteDefinition,
+  fn: HookFunction,
+  state: ExecutionState,
+): Promise<boolean> {
+  const outcome = await invokeHook(type, suite, fn, state);
+  if (!outcome.passed) {
+    recordHookFailure(type, suite, outcome.error, state);
+  }
+  return outcome.passed;
 }
 
 function suiteHasRunnableTest(
@@ -288,39 +346,236 @@ function reportSkippedTests(
   }
 }
 
+interface PendingHookError {
+  readonly type: HookType;
+  readonly suite: SuiteDefinition;
+  readonly error: unknown;
+}
+
 async function executeTestWithHooks(
   test: TestDefinition,
   beforeEachHooks: readonly ScopedHook[],
   afterEachHooks: readonly ScopedHook[],
   state: ExecutionState,
-): Promise<void> {
-  beginSnapshotTest(test.fullName);
-  let hookFailure: { readonly error: unknown } | undefined;
+): Promise<TestResult> {
+  const attempts = (test.retry ?? 0) + 1;
+  let result = createResult(test, 'passed', 0, undefined);
+  let pendingErrors: PendingHookError[] = [];
 
-  for (const hook of beforeEachHooks) {
-    const passed = await runHook('beforeEach', hook.suite, hook.fn, state);
-    if (!passed) {
-      hookFailure = { error: state.errors[state.errors.length - 1]?.error };
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const attemptErrors: PendingHookError[] = [];
+    resetSoftAssertions();
+    beginSnapshotTest(test.fullName);
+    let hookFailure: { readonly error: unknown } | undefined;
+
+    for (const hook of beforeEachHooks) {
+      const outcome = await invokeHook(
+        'beforeEach',
+        hook.suite,
+        hook.fn,
+        state,
+      );
+      if (!outcome.passed) {
+        hookFailure = { error: outcome.error };
+        attemptErrors.push({
+          type: 'beforeEach',
+          suite: hook.suite,
+          error: outcome.error,
+        });
+        break;
+      }
+    }
+
+    if (hookFailure !== undefined) {
+      if (test.mode === 'fails') {
+        result = createResult(test, 'passed', 0, undefined);
+      } else {
+        result = createResult(test, 'failed', 0, hookFailure.error);
+      }
+    } else {
+      result = await executeTest(test, state.timeout, 'passed');
+    }
+
+    for (let index = afterEachHooks.length - 1; index >= 0; index -= 1) {
+      const hook = afterEachHooks[index];
+      if (hook !== undefined) {
+        const outcome = await invokeHook(
+          'afterEach',
+          hook.suite,
+          hook.fn,
+          state,
+        );
+        if (!outcome.passed) {
+          attemptErrors.push({
+            type: 'afterEach',
+            suite: hook.suite,
+            error: outcome.error,
+          });
+        }
+      }
+    }
+
+    const softErrors = takeSoftAssertions();
+    if (softErrors.length > 0) {
+      const softError = createSoftAssertionError(softErrors);
+      if (result.status === 'passed') {
+        if (test.mode !== 'fails') {
+          result = createResult(test, 'failed', result.duration, softError);
+        }
+      } else {
+        result = createResult(
+          test,
+          result.status,
+          result.duration,
+          combineErrors(result.error, softError),
+        );
+      }
+    }
+
+    endSnapshotTest();
+    pendingErrors = attemptErrors;
+
+    if (result.status === 'passed') {
       break;
     }
   }
 
-  let result: TestResult;
-  if (hookFailure !== undefined) {
-    result = createResult(test, 'failed', 0, hookFailure.error);
-  } else {
-    result = await executeTest(test, state.timeout, 'passed');
+  for (const pending of pendingErrors) {
+    recordHookFailure(pending.type, pending.suite, pending.error, state);
   }
 
-  for (let index = afterEachHooks.length - 1; index >= 0; index -= 1) {
-    const hook = afterEachHooks[index];
-    if (hook !== undefined) {
-      await runHook('afterEach', hook.suite, hook.fn, state);
+  return result;
+}
+
+function isConcurrentTest(
+  test: TestDefinition,
+  suiteConcurrent: boolean,
+): boolean {
+  return suiteConcurrent || test.mode === 'concurrent';
+}
+
+async function executeConcurrentTests(
+  tests: readonly TestDefinition[],
+  beforeEachHooks: readonly ScopedHook[],
+  afterEachHooks: readonly ScopedHook[],
+  state: ExecutionState,
+): Promise<void> {
+  const results = await Promise.all(
+    tests.map((test) =>
+      executeTestWithHooks(test, beforeEachHooks, afterEachHooks, state),
+    ),
+  );
+
+  for (const result of results) {
+    recordResult(result, state);
+  }
+}
+
+async function executeConcurrentSuite(
+  suite: SuiteDefinition,
+  beforeEachHooks: readonly ScopedHook[],
+  afterEachHooks: readonly ScopedHook[],
+  state: ExecutionState,
+): Promise<void> {
+  const tests: TestDefinition[] = [];
+  const tasks: Promise<void>[] = [];
+
+  for (const item of suite.items) {
+    if (item.kind === 'suite') {
+      continue;
+    }
+
+    const status = state.statuses.get(item);
+    if (status === undefined) {
+      continue;
+    }
+
+    if (status !== 'passed') {
+      recordResult(createResult(item, status, 0, undefined), state);
+      continue;
+    }
+
+    tests.push(item);
+  }
+
+  if (tests.length > 0) {
+    tasks.push(
+      executeConcurrentTests(tests, beforeEachHooks, afterEachHooks, state),
+    );
+  }
+
+  for (const item of suite.items) {
+    if (item.kind === 'suite') {
+      tasks.push(
+        executeSuite(item, beforeEachHooks, afterEachHooks, state, true),
+      );
     }
   }
 
-  endSnapshotTest();
-  recordResult(result, state);
+  await Promise.all(tasks);
+}
+
+async function executeSequentialSuite(
+  suite: SuiteDefinition,
+  beforeEachHooks: readonly ScopedHook[],
+  afterEachHooks: readonly ScopedHook[],
+  suiteConcurrent: boolean,
+  state: ExecutionState,
+): Promise<void> {
+  let batch: TestDefinition[] = [];
+
+  const flush = async (): Promise<void> => {
+    if (batch.length === 0) {
+      return;
+    }
+
+    const tests = batch;
+    batch = [];
+    await executeConcurrentTests(tests, beforeEachHooks, afterEachHooks, state);
+  };
+
+  for (const item of suite.items) {
+    if (state.bailed) {
+      break;
+    }
+
+    if (item.kind === 'suite') {
+      await flush();
+      await executeSuite(item, beforeEachHooks, afterEachHooks, state, suiteConcurrent);
+      continue;
+    }
+
+    const status = state.statuses.get(item);
+    if (status === undefined) {
+      continue;
+    }
+
+    if (status !== 'passed') {
+      await flush();
+      recordResult(createResult(item, status, 0, undefined), state);
+      continue;
+    }
+
+    if (isConcurrentTest(item, suiteConcurrent)) {
+      batch.push(item);
+      continue;
+    }
+
+    await flush();
+    if (state.bailed) {
+      break;
+    }
+
+    const result = await executeTestWithHooks(
+      item,
+      beforeEachHooks,
+      afterEachHooks,
+      state,
+    );
+    recordResult(result, state);
+  }
+
+  await flush();
 }
 
 async function executeSuite(
@@ -328,6 +583,7 @@ async function executeSuite(
   ancestorBeforeEach: readonly ScopedHook[],
   ancestorAfterEach: readonly ScopedHook[],
   state: ExecutionState,
+  ancestorConcurrent = false,
 ): Promise<void> {
   if (state.bailed || !suiteHasRunnableTest(suite, state.statuses)) {
     reportSkippedTests(suite, state);
@@ -342,6 +598,7 @@ async function executeSuite(
     ...ancestorAfterEach,
     ...suite.hooks.afterEach.map((fn): ScopedHook => ({ suite, fn })),
   ];
+  const suiteConcurrent = ancestorConcurrent || suite.mode === 'concurrent';
 
   let beforeAllFailed = false;
 
@@ -355,39 +612,21 @@ async function executeSuite(
 
   if (beforeAllFailed) {
     reportSkippedTests(suite, state);
+  } else if (suiteConcurrent) {
+    await executeConcurrentSuite(
+      suite,
+      beforeEachHooks,
+      afterEachHooks,
+      state,
+    );
   } else {
-    for (const item of suite.items) {
-      if (state.bailed) {
-        break;
-      }
-
-      if (item.kind === 'suite') {
-        await executeSuite(
-          item,
-          beforeEachHooks,
-          afterEachHooks,
-          state,
-        );
-        continue;
-      }
-
-      const status = state.statuses.get(item);
-      if (status === undefined) {
-        continue;
-      }
-
-      if (status !== 'passed') {
-        recordResult(createResult(item, status, 0, undefined), state);
-        continue;
-      }
-
-      await executeTestWithHooks(
-        item,
-        beforeEachHooks,
-        afterEachHooks,
-        state,
-      );
-    }
+    await executeSequentialSuite(
+      suite,
+      beforeEachHooks,
+      afterEachHooks,
+      suiteConcurrent,
+      state,
+    );
   }
 
   for (let index = suite.hooks.afterAll.length - 1; index >= 0; index -= 1) {
@@ -396,6 +635,26 @@ async function executeSuite(
       await runHook('afterAll', suite, fn, state);
     }
   }
+}
+
+function sortResultsByRegistrationOrder(
+  results: TestResult[],
+  collected: readonly CollectedTest[],
+): void {
+  const positions = new Map<string, number>();
+
+  for (let index = collected.length - 1; index >= 0; index -= 1) {
+    const entry = collected[index];
+    if (entry !== undefined) {
+      positions.set(entry.test.fullName, index);
+    }
+  }
+
+  results.sort((left, right) => {
+    const leftIndex = positions.get(left.fullName) ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = positions.get(right.fullName) ?? Number.MAX_SAFE_INTEGER;
+    return leftIndex - rightIndex;
+  });
 }
 
 export async function runSuite(
@@ -437,6 +696,7 @@ export async function runSuite(
   };
 
   await executeSuite(rootSuite, [], [], state);
+  sortResultsByRegistrationOrder(state.results, collected);
 
   const summary = summarize(state.results);
 
