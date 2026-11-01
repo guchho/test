@@ -1,3 +1,13 @@
+import {
+  any,
+  anything,
+  arrayContaining,
+  closeTo,
+  objectContaining,
+  stringContaining,
+  stringMatching,
+} from './asymmetric.js';
+import type { AsymmetricMatcher } from './asymmetric.js';
 import { formatDiff } from './diff.js';
 import { AssertionError } from './errors.js';
 import {
@@ -42,9 +52,20 @@ export interface Matchers<R = void> {
   toBeLessThan(expected: number): R;
   toBeGreaterThanOrEqual(expected: number): R;
   toBeLessThanOrEqual(expected: number): R;
+  toMatchObject(expected: unknown): R;
+  toHaveProperty(
+    path: string | readonly (string | number)[],
+    value?: unknown,
+  ): R;
+  toBeCloseTo(expected: number, digits?: number): R;
   toHaveBeenCalled(): R;
   toHaveBeenCalledTimes(expected: number): R;
   toHaveBeenCalledWith(...expected: unknown[]): R;
+  toHaveBeenLastCalledWith(...expected: unknown[]): R;
+  toHaveBeenNthCalledWith(callIndex: number, ...expected: unknown[]): R;
+  toHaveReturned(): R;
+  toHaveReturnedWith(expected: unknown): R;
+  toHaveReturnedTimes(expected: number): R;
   toMatchSnapshot(hint?: string): R;
   toMatchInlineSnapshot(snapshot?: string): R;
 }
@@ -61,7 +82,17 @@ export interface AsyncExpectation extends Matchers<Promise<void>> {
   readonly not: AsyncExpectation;
 }
 
-export interface Expect {
+export interface AsymmetricMatchers {
+  any(sample: Function): AsymmetricMatcher;
+  anything(): AsymmetricMatcher;
+  objectContaining(sample: Record<PropertyKey, unknown>): AsymmetricMatcher;
+  arrayContaining(sample: readonly unknown[]): AsymmetricMatcher;
+  stringContaining(sample: string): AsymmetricMatcher;
+  stringMatching(sample: string | RegExp): AsymmetricMatcher;
+  closeTo(expected: number, digits?: number): AsymmetricMatcher;
+}
+
+export interface Expect extends AsymmetricMatchers {
   <T = unknown>(actual: T): Expectation;
   extend(matchers: Record<string, Matcher>): void;
   addEqualityTest(test: EqualityTest): () => void;
@@ -283,5 +314,12 @@ export const expect: Expect = Object.assign(
   {
     extend,
     addEqualityTest,
+    any,
+    anything,
+    objectContaining,
+    arrayContaining,
+    stringContaining,
+    stringMatching,
+    closeTo,
   },
 );
