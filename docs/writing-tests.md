@@ -143,6 +143,73 @@ todo('also later');
 
 A todo test has no callback and is reported with status `todo`.
 
+### Concurrent
+
+```js
+it.concurrent('loads a user', async () => {
+  await loadUser(1);
+});
+
+describe.concurrent('requests', () => {
+  it('reads', async () => {
+    await request('/read');
+  });
+
+  it('writes', async () => {
+    await request('/write');
+  });
+});
+```
+
+Tests marked concurrent run in parallel with other concurrent tests in the same
+suite. `describe.concurrent` applies to the suite and all nested suites. A
+non-concurrent test waits for the current concurrent batch to finish. Lifecycle
+hooks run per test (`beforeEach`/`afterEach`) or once per suite
+(`beforeAll`/`afterAll`), and results are reported in registration order.
+
+Concurrent tests share the same process, so avoid shared mutable state unless
+you synchronize access yourself.
+
+### Run if / skip if
+
+```js
+it.runIf(process.platform === 'win32')('Windows only', () => {});
+it.skipIf(process.env.CI === 'true')('local only', () => {});
+```
+
+`it.runIf(condition)` registers a normal test when the condition is `true` and a
+skipped test otherwise. `it.skipIf(condition)` registers a normal test when the
+condition is `false`. Both variants support `.each`.
+
+### Retries
+
+Pass `retry` in the options object:
+
+```js
+it('flaky request', async () => {
+  await requestThatSometimesFails();
+}, { retry: 2 });
+```
+
+Or use the retry modifier:
+
+```js
+it.retry(2)('flaky request', async () => {
+  await requestThatSometimesFails();
+});
+```
+
+A test runs at most `retry + 1` times. Each attempt reruns `beforeEach` and
+`afterEach`; `beforeAll` and `afterAll` run once per suite. Retries also apply to
+failures from `beforeEach` and to timeouts. Use the options object to set both
+values:
+
+```js
+it('slow and flaky', async () => {
+  await requestThatSometimesFails();
+}, { retry: 2, timeout: 10000 });
+```
+
 ## Filters
 
 Filter by substring of the full test name:
