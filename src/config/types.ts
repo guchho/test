@@ -30,5 +30,9 @@ export interface GuchhoConfig {
   timeout?: number;
   reporters?: ReporterEntry[];
   plugins?: string[];
+  setupFiles?: string[];
+  setupFilesAfterEnv?: string[];
+  globalSetup?: string;
+  globalTeardown?: string;
   coverage?: CoverageConfig;
 }
