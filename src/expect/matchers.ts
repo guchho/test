@@ -1,6 +1,7 @@
 import { isMockFunction } from '../mock/mock.js';
 import { snapshotMatchers } from '../snapshot/matchers.js';
 import type { MockFunction } from '../mock/mock.js';
+import { isAsymmetricMatcher } from './asymmetric.js';
 import { deepEqual } from './equality.js';
 import type {
   Matcher,
@@ -79,6 +80,200 @@ function itemEquals(actual: unknown, expected: unknown): boolean {
     typeof expected === 'object' &&
     deepEqual(actual, expected)
   );
+}
+
+type SeenObjectPairs = WeakMap<object, WeakSet<object>>;
+
+function matchesObjectShape(
+  actual: unknown,
+  expected: unknown,
+  seen: SeenObjectPairs = new WeakMap(),
+): boolean {
+  if (isAsymmetricMatcher(expected)) {
+    return expected.asymmetricMatch(actual, deepEqual);
+  }
+
+  if (expected === null || typeof expected !== 'object') {
+    return deepEqual(actual, expected);
+  }
+
+  if (actual === null || typeof actual !== 'object') {
+    return false;
+  }
+
+  if (
+    expected instanceof Date ||
+    expected instanceof RegExp ||
+    expected instanceof Map ||
+    expected instanceof Set
+  ) {
+    return deepEqual(actual, expected);
+  }
+
+  let seenForActual = seen.get(actual);
+  if (seenForActual === undefined) {
+    seenForActual = new WeakSet<object>();
+    seen.set(actual, seenForActual);
+  }
+
+  if (seenForActual.has(expected)) {
+    return true;
+  }
+
+  seenForActual.add(expected);
+
+  try {
+    if (Array.isArray(expected)) {
+      if (!Array.isArray(actual) || actual.length !== expected.length) {
+        return false;
+      }
+
+      return expected.every((value, index) =>
+        matchesObjectShape(actual[index], value, seen),
+      );
+    }
+
+    const record = actual as Record<PropertyKey, unknown>;
+    const sample = expected as Record<PropertyKey, unknown>;
+
+    for (const key of Reflect.ownKeys(expected)) {
+      if (!Object.prototype.propertyIsEnumerable.call(expected, key)) {
+        continue;
+      }
+
+      if (!(key in record)) {
+        return false;
+      }
+
+      if (!matchesObjectShape(record[key], sample[key], seen)) {
+        return false;
+      }
+    }
+
+    return true;
+  } finally {
+    seenForActual.delete(expected);
+  }
+}
+
+function toPropertyPath(path: unknown): PropertyKey[] {
+  if (Array.isArray(path)) {
+    if (path.length === 0) {
+      throw new TypeError('toHaveProperty expects a non-empty property path.');
+    }
+
+    return path.map((segment) => {
+      if (typeof segment !== 'string' && typeof segment !== 'number') {
+        throw new TypeError(
+          'toHaveProperty path segments must be strings or numbers.',
+        );
+      }
+
+      return segment;
+    });
+  }
+
+  if (typeof path !== 'string' || path.length === 0) {
+    throw new TypeError(
+      'toHaveProperty expects a string or array property path.',
+    );
+  }
+
+  const segments: string[] = [];
+  let index = 0;
+
+  while (index < path.length) {
+    if (path[index] === '.') {
+      index += 1;
+      continue;
+    }
+
+    if (path[index] === '[') {
+      const close = path.indexOf(']', index);
+      if (close === -1) {
+        throw new TypeError(
+          `toHaveProperty received an invalid property path "${path}".`,
+        );
+      }
+
+      let segment = path.slice(index + 1, close).trim();
+      if (
+        (segment.startsWith('"') && segment.endsWith('"')) ||
+        (segment.startsWith("'") && segment.endsWith("'"))
+      ) {
+        segment = segment.slice(1, -1);
+      }
+
+      if (segment.length === 0) {
+        throw new TypeError(
+          `toHaveProperty received an invalid property path "${path}".`,
+        );
+      }
+
+      segments.push(segment);
+      index = close + 1;
+      continue;
+    }
+
+    let end = index;
+    while (end < path.length && path[end] !== '.' && path[end] !== '[') {
+      end += 1;
+    }
+
+    const segment = path.slice(index, end);
+    if (segment.length === 0) {
+      throw new TypeError(
+        `toHaveProperty received an invalid property path "${path}".`,
+      );
+    }
+
+    segments.push(segment);
+    index = end;
+  }
+
+  if (segments.length === 0) {
+    throw new TypeError('toHaveProperty expects a non-empty property path.');
+  }
+
+  return segments;
+}
+
+function readPropertyPath(
+  actual: unknown,
+  path: readonly PropertyKey[],
+): { readonly found: boolean; readonly value: unknown } {
+  let current = actual;
+
+  for (const segment of path) {
+    if (
+      current === null ||
+      current === undefined ||
+      (typeof current !== 'object' && typeof current !== 'function')
+    ) {
+      return { found: false, value: undefined };
+    }
+
+    const record = current as Record<PropertyKey, unknown>;
+    if (!(segment in record)) {
+      return { found: false, value: undefined };
+    }
+
+    current = record[segment];
+  }
+
+  return { found: true, value: current };
+}
+
+function isCloseTo(actual: unknown, expected: number, digits: number): boolean {
+  if (typeof actual !== 'number' || Number.isNaN(actual)) {
+    return false;
+  }
+
+  if (Object.is(actual, expected)) {
+    return true;
+  }
+
+  return Math.abs(actual - expected) < 10 ** -digits / 2;
 }
 
 function lengthOf(value: unknown): number | undefined {
@@ -174,6 +369,12 @@ function formatCalls(context: MatcherContext, mock: MockFunction): string {
   }
 
   return `Received calls: ${context.utils.printReceived(mock.mock.calls)}`;
+}
+
+function returnValues(mock: MockFunction): unknown[] {
+  return mock.mock.results
+    .filter((result) => result.type === 'return')
+    .map((result) => result.value);
 }
 
 function matchThrow(
@@ -505,6 +706,90 @@ export const builtInMatchers: Record<string, Matcher> = {
     };
   },
 
+  toMatchObject(actual, expected) {
+    return {
+      pass: matchesObjectShape(actual, expected),
+      message: (): string =>
+        assertionMessage(this, 'toMatchObject', actual, expected, {
+          detail: this.utils.diff(expected, actual),
+        }),
+    };
+  },
+
+  toHaveProperty(actual, ...expected) {
+    if (expected.length === 0) {
+      throw new TypeError(
+        'toHaveProperty expects a property path and an optional value.',
+      );
+    }
+
+    const path = toPropertyPath(expected[0]);
+    const result = readPropertyPath(actual, path);
+    const receivedPath = path
+      .map((segment) => String(segment))
+      .join('.');
+    const pass =
+      result.found &&
+      (expected.length < 2 || deepEqual(result.value, expected[1]));
+
+    return {
+      pass,
+      message: (): string => {
+        const lines = [signature(this, 'toHaveProperty', true), ''];
+
+        if (!result.found) {
+          lines.push(`Expected path: ${receivedPath}`);
+          lines.push('Received: the property path does not exist.');
+          return lines.join('\n');
+        }
+
+        if (expected.length > 1) {
+          lines.push(
+            `Expected value at ${receivedPath}: ${this.isNot ? 'not ' : ''}${this.utils.printExpected(expected[1])}`,
+          );
+          lines.push(
+            `Received value: ${this.utils.printReceived(result.value)}`,
+          );
+          return lines.join('\n');
+        }
+
+        lines.push(
+          this.isNot
+            ? `Expected the property path ${receivedPath} not to exist.`
+            : `Expected the property path ${receivedPath} to exist.`,
+        );
+        lines.push(
+          `Received value: ${this.utils.printReceived(result.value)}`,
+        );
+        return lines.join('\n');
+      },
+    };
+  },
+
+  toBeCloseTo(actual, expected, digits = 2) {
+    if (typeof expected !== 'number') {
+      throw new TypeError('toBeCloseTo expects a number.');
+    }
+
+    if (
+      typeof digits !== 'number' ||
+      !Number.isInteger(digits) ||
+      digits < 0
+    ) {
+      throw new TypeError(
+        'toBeCloseTo expects a non-negative integer precision.',
+      );
+    }
+
+    return {
+      pass: isCloseTo(actual, expected, digits),
+      message: (): string =>
+        assertionMessage(this, 'toBeCloseTo', actual, expected, {
+          expectedLabel: `${this.isNot ? 'not ' : ''}${expected} (±${10 ** -digits / 2})`,
+        }),
+    };
+  },
+
   toHaveBeenCalled(actual) {
     const mock = requireMock(actual, 'toHaveBeenCalled');
     const callCount = mock.mock.calls.length;
@@ -564,6 +849,125 @@ export const builtInMatchers: Record<string, Matcher> = {
           '',
           `Expected: ${this.isNot ? 'not ' : ''}${this.utils.printExpected(expected)}`,
           formatCalls(this, mock),
+        ].join('\n'),
+    };
+  },
+
+  toHaveBeenLastCalledWith(actual, ...expected) {
+    const mock = requireMock(actual, 'toHaveBeenLastCalledWith');
+    const lastCall = mock.mock.lastCall;
+    const pass =
+      lastCall !== undefined && deepEqual(lastCall, expected);
+
+    return {
+      pass,
+      message: (): string =>
+        [
+          signature(this, 'toHaveBeenLastCalledWith', true),
+          '',
+          `Expected: ${this.isNot ? 'not ' : ''}${this.utils.printExpected(expected)}`,
+          lastCall === undefined
+            ? 'Received: the mock function was never called.'
+            : `Received last call: ${this.utils.printReceived(lastCall)}`,
+        ].join('\n'),
+    };
+  },
+
+  toHaveBeenNthCalledWith(actual, ...expected) {
+    const mock = requireMock(actual, 'toHaveBeenNthCalledWith');
+    const callIndex = expected[0];
+
+    if (
+      typeof callIndex !== 'number' ||
+      !Number.isInteger(callIndex) ||
+      callIndex < 1
+    ) {
+      throw new TypeError(
+        'toHaveBeenNthCalledWith expects a positive integer call index.',
+      );
+    }
+
+    const call = mock.mock.calls[callIndex - 1];
+    const args = expected.slice(1);
+    const pass = call !== undefined && deepEqual(call, args);
+
+    return {
+      pass,
+      message: (): string =>
+        [
+          signature(this, 'toHaveBeenNthCalledWith', true),
+          '',
+          `Expected call ${callIndex}: ${this.isNot ? 'not ' : ''}${this.utils.printExpected(args)}`,
+          call === undefined
+            ? `Received: the mock function was called ${mock.mock.calls.length} time(s).`
+            : `Received call ${callIndex}: ${this.utils.printReceived(call)}`,
+        ].join('\n'),
+    };
+  },
+
+  toHaveReturned(actual) {
+    const mock = requireMock(actual, 'toHaveReturned');
+    const values = returnValues(mock);
+    const pass = values.length > 0;
+
+    return {
+      pass,
+      message: (): string =>
+        [
+          signature(this, 'toHaveReturned', false),
+          '',
+          this.isNot
+            ? `Expected mock function not to have returned, but it returned ${values.length} time(s).`
+            : 'Expected mock function to have returned.',
+          values.length === 0
+            ? 'Received: the mock function never returned.'
+            : `Received returns: ${this.utils.printReceived(values)}`,
+        ].join('\n'),
+    };
+  },
+
+  toHaveReturnedWith(actual, expected) {
+    const mock = requireMock(actual, 'toHaveReturnedWith');
+    const values = returnValues(mock);
+    const pass = values.some((value) => deepEqual(value, expected));
+
+    return {
+      pass,
+      message: (): string =>
+        [
+          signature(this, 'toHaveReturnedWith', true),
+          '',
+          `Expected: ${this.isNot ? 'not ' : ''}${this.utils.printExpected(expected)}`,
+          values.length === 0
+            ? 'Received: the mock function never returned.'
+            : `Received returns: ${this.utils.printReceived(values)}`,
+        ].join('\n'),
+    };
+  },
+
+  toHaveReturnedTimes(actual, expected) {
+    const mock = requireMock(actual, 'toHaveReturnedTimes');
+
+    if (
+      typeof expected !== 'number' ||
+      !Number.isInteger(expected) ||
+      expected < 0
+    ) {
+      throw new TypeError(
+        'toHaveReturnedTimes expects a non-negative integer.',
+      );
+    }
+
+    const count = returnValues(mock).length;
+
+    return {
+      pass: count === expected,
+      message: (): string =>
+        [
+          signature(this, 'toHaveReturnedTimes', true),
+          '',
+          `Expected number of returns: ${this.isNot ? `not ${expected}` : expected}`,
+          `Received number of returns: ${count}`,
         ].join('\n'),
     };
   },
