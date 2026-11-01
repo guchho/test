@@ -44,6 +44,7 @@ test('prints version and help', async () => {
   assert.equal(help.code, 0);
   assert.match(help.stdout, /Usage: guchho-test/);
   assert.match(help.stdout, /--filter/);
+  assert.match(help.stdout, /--shard/);
 });
 
 test('rejects unknown options with exit code 2', async () => {
@@ -212,6 +213,75 @@ test('discovers test files in the working directory', async () => {
       result.stdout,
       /Tests: 1 passed, 0 failed, 0 skipped, 0 todo/,
     );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('shards discovered test files deterministically', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'guchho-test-'));
+
+  try {
+    const names = ['alpha', 'bravo', 'charlie', 'delta', 'echo'];
+
+    for (const name of names) {
+      await writeFile(
+        path.join(directory, `${name}.test.js`),
+        `import { it } from ${JSON.stringify(distIndexUrl)};\n` +
+          `it(${JSON.stringify(`${name} test`)}, () => {});\n`,
+      );
+    }
+
+    const counts = new Map();
+
+    for (const shard of ['1/2', '2/2']) {
+      const result = await runCli([`--shard=${shard}`], { cwd: directory });
+      assert.equal(result.code, 0, result.stderr);
+
+      for (const name of names) {
+        if (result.stdout.includes(`${name}.test.js`)) {
+          counts.set(name, (counts.get(name) ?? 0) + 1);
+        }
+      }
+    }
+
+    assert.equal(counts.size, names.length);
+    for (const name of names) {
+      assert.equal(counts.get(name), 1, `${name} ran in exactly one shard`);
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('rejects invalid --shard values and watch combinations', async () => {
+  for (const value of ['0/2', '3/2', '1', '1/0', 'a/b', '1/2/3', '-1/2']) {
+    const result = await runCli([`--shard=${value}`]);
+    assert.equal(result.code, 2, value);
+    assert.match(result.stderr, /--shard/, value);
+  }
+
+  const watch = await runCli(['watch', '--shard=1/2']);
+  assert.equal(watch.code, 2);
+  assert.match(watch.stderr, /--shard option cannot be used with watch mode/);
+});
+
+test('reports when a shard selects no test files', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'guchho-test-'));
+
+  try {
+    for (const name of ['first', 'second']) {
+      await writeFile(
+        path.join(directory, `${name}.test.js`),
+        `import { it } from ${JSON.stringify(distIndexUrl)};\n` +
+          `it('${name}', () => {});\n`,
+      );
+    }
+
+    const result = await runCli(['--shard=3/3'], { cwd: directory });
+
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, /Shard 3\/3 selected no test files/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
