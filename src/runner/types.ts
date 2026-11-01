@@ -1,8 +1,13 @@
-export type TestMode = 'normal' | 'skip' | 'only' | 'todo';
+export type TestMode = 'normal' | 'skip' | 'only' | 'todo' | 'fails' | 'concurrent';
 
 export type TestStatus = 'passed' | 'failed' | 'skipped' | 'todo';
 
 export type TestFunction = () => void | Promise<unknown>;
+
+export interface TestOptions {
+  readonly timeout?: number;
+  readonly retry?: number;
+}
 
 export type HookType = 'beforeAll' | 'afterAll' | 'beforeEach' | 'afterEach';
 
@@ -22,6 +27,7 @@ export interface TestDefinition {
   readonly fn: TestFunction | undefined;
   readonly mode: TestMode;
   readonly timeout: number | undefined;
+  readonly retry: number | undefined;
 }
 
 export interface SuiteDefinition {
