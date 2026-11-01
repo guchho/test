@@ -368,3 +368,51 @@ test('assertion failures are AssertionError instances with context', () => {
   assert.match(diffError.message, /- .*expected/);
   assert.match(diffError.message, /\+ .*actual/);
 });
+
+test('expect.poll retries until the assertion passes', async () => {
+  let attempts = 0;
+
+  await expect
+    .poll(
+      () => {
+        attempts += 1;
+        return attempts < 3 ? 'pending' : 'ready';
+      },
+      { timeout: 500, interval: 5 },
+    )
+    .toBe('ready');
+
+  assert.equal(attempts, 3);
+});
+
+test('expect.poll supports async callbacks and negation', async () => {
+  let attempts = 0;
+
+  await expect
+    .poll(
+      async () => {
+        attempts += 1;
+        return attempts < 2 ? 'pending' : 'done';
+      },
+      { timeout: 500, interval: 5 },
+    )
+    .not.toBe('pending');
+
+  assert.equal(attempts, 2);
+});
+
+test('expect.poll fails after the timeout', async () => {
+  await assert.rejects(
+    () =>
+      expect
+        .poll(() => 'pending', { timeout: 20, interval: 5 })
+        .toBe('ready'),
+    AssertionError,
+  );
+});
+
+test('expect.poll validates its callback and options', () => {
+  assert.throws(() => expect.poll(null), TypeError);
+  assert.throws(() => expect.poll(() => true, { timeout: 0 }), TypeError);
+  assert.throws(() => expect.poll(() => true, { interval: -1 }), TypeError);
+});
