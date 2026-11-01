@@ -447,6 +447,8 @@ function executionOptions(
   timeout: number,
   setupFiles: readonly string[],
   setupFilesAfterEnv: readonly string[],
+  globalSetup: string | undefined,
+  globalTeardown: string | undefined,
 ): ExecutionOptions {
   return {
     filter: parsed.filter,
@@ -459,6 +461,8 @@ function executionOptions(
     coverage: parsed.coverage,
     setupFiles,
     setupFilesAfterEnv,
+    globalSetup,
+    globalTeardown,
   };
 }
 
@@ -559,6 +563,8 @@ export async function main(
       config.timeout,
       config.setupFiles,
       config.setupFilesAfterEnv,
+      config.globalSetup,
+      config.globalTeardown,
     );
     const entries = reporterEntries(parsed, config.reporters);
     const coverageConfig = parsed.coverage
