@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -77,6 +77,8 @@ test('validateConfig accepts a complete configuration', () => {
       plugins: ['./plugin.js'],
       setupFiles: ['./setup.js'],
       setupFilesAfterEnv: ['./setup-after.js'],
+      globalSetup: './global-setup.js',
+      globalTeardown: './global-teardown.js',
       coverage: {
         enabled: true,
         reportsDirectory: 'reports/coverage',
@@ -96,6 +98,8 @@ test('validateConfig accepts a complete configuration', () => {
     plugins: ['./plugin.js'],
     setupFiles: ['./setup.js'],
     setupFilesAfterEnv: ['./setup-after.js'],
+    globalSetup: './global-setup.js',
+    globalTeardown: './global-teardown.js',
     coverage: {
       enabled: true,
       reportsDirectory: 'reports/coverage',
@@ -156,6 +160,14 @@ test('validateConfig rejects unknown and malformed options', () => {
     /"setupFilesAfterEnv" must only contain non-empty strings/,
   );
   assert.throws(
+    () => validateConfig({ globalSetup: '' }, 'config.json'),
+    /"globalSetup" must be a non-empty string/,
+  );
+  assert.throws(
+    () => validateConfig({ globalTeardown: 42 }, 'config.json'),
+    /"globalTeardown" must be a non-empty string/,
+  );
+  assert.throws(
     () => validateConfig({ coverage: { thresholds: { lines: -1 } } }, 'config.json'),
     /coverage threshold "lines" must be a non-negative number/,
   );
@@ -182,6 +194,8 @@ test('resolveConfig applies defaults and config precedence', () => {
   assert.deepEqual([...defaults.plugins], []);
   assert.deepEqual([...defaults.setupFiles], []);
   assert.deepEqual([...defaults.setupFilesAfterEnv], []);
+  assert.equal(defaults.globalSetup, undefined);
+  assert.equal(defaults.globalTeardown, undefined);
   assert.equal(defaults.coverage.reportsDirectory, 'coverage');
 
   const configured = resolveConfig({
