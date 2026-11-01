@@ -50,6 +50,8 @@ export interface WorkerInput {
   readonly bail: boolean;
   readonly updateSnapshots: boolean;
   readonly coverage: boolean;
+  readonly setupFiles: readonly string[];
+  readonly setupFilesAfterEnv: readonly string[];
 }
 
 export type WorkerOutcome = (
