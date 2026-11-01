@@ -1,5 +1,6 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import {
   ConfigError,
@@ -55,7 +56,15 @@ interface ExecutionOptions {
   readonly coverage: boolean;
   readonly setupFiles: readonly string[];
   readonly setupFilesAfterEnv: readonly string[];
+  readonly globalSetup: string | undefined;
+  readonly globalTeardown: string | undefined;
 }
+
+interface GlobalHookContext {
+  readonly cwd: string;
+}
+
+type GlobalHook = (context: GlobalHookContext) => void | Promise<void>;
 
 const emptySummary: RunSummary = {
   total: 0,
@@ -75,6 +84,43 @@ function createDefaultIO(): CliIO {
       process.stderr.write(text);
     },
   };
+}
+
+async function runGlobalHook(
+  file: string | undefined,
+  label: 'globalSetup' | 'globalTeardown',
+  cwd: string,
+): Promise<void> {
+  if (file === undefined) {
+    return;
+  }
+
+  const absolutePath = path.resolve(cwd, file);
+  let loaded: Record<string, unknown>;
+
+  try {
+    loaded = (await import(pathToFileURL(absolutePath).href)) as Record<
+      string,
+      unknown
+    >;
+  } catch (error) {
+    throw new Error(
+      `Failed to load ${label} module "${file}": ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  const named = label === 'globalSetup' ? loaded.setup : loaded.teardown;
+  const hook = [loaded.default, loaded[label], named].find(
+    (candidate): candidate is GlobalHook => typeof candidate === 'function',
+  );
+
+  if (hook === undefined) {
+    throw new Error(`${label} module "${file}" must export a function.`);
+  }
+
+  await hook({ cwd });
 }
 
 function displayPath(cwd: string, file: string): string {
@@ -216,6 +262,14 @@ async function executeFiles(
   const fileReports: FileReport[] = [];
   const coveragePayloads: CoveragePayload[] = [];
 
+  try {
+    await runGlobalHook(options.globalSetup, 'globalSetup', io.cwd);
+  } catch (error) {
+    io.stderr(`Failed to run globalSetup: ${formatError(error)}\n`);
+    await pool.close();
+    return 2;
+  }
+
   for (const reporter of reporters) {
     reporter.onRunStart?.(files.length);
   }
@@ -248,6 +302,13 @@ async function executeFiles(
     }
   } finally {
     await pool.close();
+
+    try {
+      await runGlobalHook(options.globalTeardown, 'globalTeardown', io.cwd);
+    } catch (error) {
+      executionError = true;
+      io.stderr(`Failed to run globalTeardown: ${formatError(error)}\n`);
+    }
   }
 
   let coverageReport: CoverageReport | undefined;
