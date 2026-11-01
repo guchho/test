@@ -31,6 +31,9 @@ test mark that test as failed.
 | `toBeLessThan(number)` | `received < number`. |
 | `toBeGreaterThanOrEqual(number)` | `received >= number`. |
 | `toBeLessThanOrEqual(number)` | `received <= number`. |
+| `toBeCloseTo(number, digits?)` | Numeric closeness within `10^-digits / 2`. Default precision is `2`. |
+| `toMatchObject(object)` | Recursive subset match. Arrays must have the same length and match element by element. |
+| `toHaveProperty(path, value?)` | Property path exists, and optionally deep-equals `value`. Paths support dot and bracket notation. |
 
 Examples:
 
@@ -71,6 +74,52 @@ expect(() => {
 If the received function returns a promise, use
 `await expect(fn).rejects.toThrow(...)` instead.
 
+### Subset and path matching
+
+```js
+expect({ id: 1, user: { name: 'Ada', role: 'admin' } }).toMatchObject({
+  user: { name: 'Ada' },
+});
+
+expect({ user: { tags: ['a', 'b'] } }).toHaveProperty('user.tags[1]', 'b');
+expect({ user: { tags: ['a', 'b'] } }).toHaveProperty(['user', 'tags', 0], 'a');
+
+expect(0.1 + 0.2).toBeCloseTo(0.3);
+expect(0.1 + 0.2).toBeCloseTo(0.3, 5);
+```
+
+## Asymmetric matchers
+
+Asymmetric matchers stand in for values inside `toEqual`, `toStrictEqual`,
+`toContain`, `toMatchObject`, `toHaveProperty`, and mock argument matchers.
+
+```js
+expect({ id: 1, name: 'Ada' }).toEqual({
+  id: expect.any(Number),
+  name: expect.stringContaining('Ad'),
+});
+
+expect({ id: 1, active: true }).toEqual(
+  expect.objectContaining({ id: expect.any(Number) }),
+);
+
+expect([1, 2, 3]).toEqual(expect.arrayContaining([3, 1]));
+
+expect('hello world').toEqual(expect.stringMatching(/^hello/));
+expect({ value: null }).toEqual({ value: expect.anything() });
+expect(0.30000000000000004).toEqual(expect.closeTo(0.3));
+```
+
+| Matcher | Description |
+|---|---|
+| `expect.any(Constructor)` | Matches primitives or instances of `Constructor`. `String`, `Number`, `Boolean`, `BigInt`, `Symbol`, `Function`, and `Object` are supported, as are custom constructors. |
+| `expect.anything()` | Matches any value except `null` and `undefined`. |
+| `expect.objectContaining(object)` | Matches an object containing at least the sample keys and values. |
+| `expect.arrayContaining(array)` | Matches an array containing the sample elements in any order. Extra elements are allowed. |
+| `expect.stringContaining(string)` | Matches a string containing the sample substring. |
+| `expect.stringMatching(stringOrRegExp)` | Matches a string against the pattern. |
+| `expect.closeTo(number, digits?)` | Matches a number within `10^-digits / 2`. |
+
 ## Mock matchers
 
 These require the received value to be a mock created by `mock.fn()` or
@@ -81,16 +130,26 @@ These require the received value to be a mock created by `mock.fn()` or
 | `toHaveBeenCalled()` | The mock was called at least once. |
 | `toHaveBeenCalledTimes(n)` | The mock was called exactly `n` times. |
 | `toHaveBeenCalledWith(...args)` | At least one call matches the arguments using deep equality. |
+| `toHaveBeenLastCalledWith(...args)` | The most recent call matches the arguments. |
+| `toHaveBeenNthCalledWith(n, ...args)` | The `n`th call (1-based) matches the arguments. |
+| `toHaveReturned()` | The mock returned at least once without throwing. |
+| `toHaveReturnedWith(value)` | At least one return value deep-equals `value`. |
+| `toHaveReturnedTimes(n)` | The mock returned exactly `n` times. |
 
 ```js
 import { mock, expect } from '@guchho/test';
 
-const fn = mock.fn();
-fn('hello');
+const fn = mock.fn((value) => value * 2);
+fn(1);
+fn(2);
 
 expect(fn).toHaveBeenCalled();
-expect(fn).toHaveBeenCalledTimes(1);
-expect(fn).toHaveBeenCalledWith('hello');
+expect(fn).toHaveBeenCalledTimes(2);
+expect(fn).toHaveBeenCalledWith(1);
+expect(fn).toHaveBeenLastCalledWith(2);
+expect(fn).toHaveBeenNthCalledWith(1, 1);
+expect(fn).toHaveReturnedWith(4);
+expect(fn).toHaveReturnedTimes(2);
 ```
 
 ## Snapshot matchers
@@ -142,6 +201,39 @@ Rules:
 - A matcher that returns a promise in a synchronous assertion throws a
   `TypeError` asking you to use `resolves`/`rejects`.
 
+## Soft assertions
+
+`expect.soft(actual)` runs a matcher like `expect(actual)`, but records failures
+instead of throwing so the rest of the test continues. Every recorded failure is
+reported when the test finishes, and the test fails.
+
+```js
+it('checks several values', () => {
+  expect.soft(response.status).toBe(200);
+  expect.soft(response.body).toMatchObject({ ok: true });
+});
+```
+
+Soft assertions support the same matchers as `expect`, including `.not`,
+`.resolves`, and `.rejects`.
+
+## Polling assertions
+
+`expect.poll(callback, options?)` retries a matcher until it passes or the
+timeout elapses. `timeout` defaults to 1000 ms and `interval` to 50 ms.
+
+```js
+await expect.poll(() => fetchStatus()).toBe('ready');
+
+await expect
+  .poll(() => value, { timeout: 5000, interval: 100 })
+  .not.toBeNull();
+```
+
+The callback may return a value or a promise. Matcher failures are retried; the
+last error is reported when the timeout is reached. `.not` is supported. Both
+`timeout` and `interval` must be positive, finite numbers.
+
 ## Deep equality behavior
 
 Deep equality supports:
@@ -158,6 +250,9 @@ Deep equality supports:
 
 `toEqual` ignores enumerable keys whose value is `undefined`. `toStrictEqual`
 keeps them and requires matching prototypes.
+
+Asymmetric matchers are evaluated on the expected side at any depth, including
+inside `Map` keys and values, `Set` values, and mock call arguments.
 
 ## Custom matchers
 
