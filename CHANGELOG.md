@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Setup modules through `setupFiles` and `setupFilesAfterEnv`, run in order
+  before each test file with clear failures for missing or throwing modules.
+- Soft assertions with `expect.soft`.
+- Polling assertions with `expect.poll`.
+
 ## [0.0.1] - 2026-10-31
 
 ### Added
