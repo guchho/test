@@ -1,14 +1,5 @@
-import {
-  formatHookError,
-  formatSummary,
-  resultLine,
-} from './format.js';
-import type {
-  FileReport,
-  Reporter,
-  ReporterIO,
-  RunReport,
-} from './types.js';
+import { formatHookError, formatSummary, resultLine } from './format.js';
+import type { FileReport, Reporter, ReporterIO, RunReport } from './types.js';
 
 export function createDefaultReporter(io: ReporterIO): Reporter {
   let fileCount = 0;
