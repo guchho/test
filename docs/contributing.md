@@ -1,3 +1,8 @@
+---
+title: Contributing
+description: Repository layout, development workflow, testing, and release process.
+---
+
 # Contributing
 
 ## Repository layout
@@ -117,7 +122,7 @@ examples. When behavior changes:
 ## Release
 
 Releases are cut only with explicit approval. The release checklist lives in
-[`ROADMAP.md`](../ROADMAP.md) and includes version bumps, changelog preparation, a
+[`ROADMAP.md`](https://github.com/guchho/test/blob/main/ROADMAP.md) and includes version bumps, changelog preparation, a
 full verification pass, CI validation, and a package content audit.
 
 Do not publish to npm or create a public release without permission.
