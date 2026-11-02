@@ -50,10 +50,7 @@ function withSeen(
   }
 }
 
-function enumerableKeys(
-  value: object,
-  strict: boolean,
-): (string | symbol)[] {
+function enumerableKeys(value: object, strict: boolean): (string | symbol)[] {
   const keys = Reflect.ownKeys(value).filter((key) =>
     Object.prototype.propertyIsEnumerable.call(value, key),
   );
