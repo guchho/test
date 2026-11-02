@@ -1,5 +1,6 @@
 import type {
   CoverageReporterName,
+  EnvironmentName,
   GuchhoConfig,
   ReporterEntry,
 } from './types.js';
@@ -15,6 +16,8 @@ export const defaultExclude = Object.freeze([
 ]);
 
 export const defaultTimeout = 5000;
+
+export const defaultEnvironment: EnvironmentName = 'node';
 
 export const defaultCoverageInclude = Object.freeze([
   '**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
@@ -35,6 +38,9 @@ export const defaultConfig: Readonly<GuchhoConfig> = Object.freeze({
   exclude: [...defaultExclude],
   timeout: defaultTimeout,
   reporters: ['default'] as ReporterEntry[],
+  environment: defaultEnvironment,
+  environmentOptions: Object.freeze({}),
+  globals: false,
   coverage: Object.freeze({
     enabled: false,
     provider: 'v8',
