@@ -1,6 +1,7 @@
 ---
 title: Mocking
 description: Mock functions, spies, fake timers, and ESM module mocking.
+date: "2026-11-02"
 ---
 
 # Mocking
@@ -10,6 +11,10 @@ Import `mock` from `@guchho/test`:
 ```js
 import { mock, expect } from '@guchho/test';
 ```
+
+Mocking replaces a dependency with a controlled implementation so a test can
+observe calls, provide deterministic results, or simulate failures. The API
+covers functions, object methods, constructors, timers, and ESM modules.
 
 ## Mock functions
 
@@ -247,6 +252,14 @@ Limitations:
   returned object are not reflected.
 - Module mocks are reset between test files when run through the CLI.
 
+## Best practices
+
+- Mock at the boundary of the code under test, not every internal function.
+- Restore spies and timers after each test to prevent cross-test leakage.
+- Prefer explicit return values over broad implementations.
+- Keep module mocks close to the test file they affect.
+- Assert on meaningful calls, not every invocation.
+
 ## Types
 
 `mock` is typed with argument and return type parameters:
@@ -257,3 +270,10 @@ fn.mockReturnValue(1);
 ```
 
 `MockFunction`, `MockState`, `MockResult`, and `MockApi` are exported types.
+
+## Related
+
+- [Assertions](./assertions.md)
+- [Lifecycle Hooks](./lifecycle-hooks.md)
+- [Configuration](./configuration.md)
+- [API Reference](./api.md)

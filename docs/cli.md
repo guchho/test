@@ -1,6 +1,7 @@
 ---
 title: CLI Reference
 description: Commands, options, filters, reporters, and exit codes for the guchho-test binary.
+date: "2026-11-02"
 ---
 
 # CLI Reference
@@ -12,6 +13,10 @@ guchho-test [command] [files...] [options]
 ```
 
 With no command, `run` is used.
+
+The CLI runs a single pass by default, or starts watch mode with `watch` or
+`--watch`. Commands accept file arguments, filters, reporter selection, coverage
+flags, sharding options, and worker controls.
 
 ## Commands
 
@@ -129,6 +134,25 @@ and `d`. Run all shards together to cover the full suite.
 `--shard` cannot be combined with watch mode. A shard that selects no files exits
 with code `2` and prints a message to stderr.
 
+## Common workflows
+
+```bash
+# Run everything once
+npx guchho-test
+
+# Run one file
+npx guchho-test src/math.test.js
+
+# Focus on matching tests
+npx guchho-test run --filter math
+
+# Produce CI-friendly output
+npx guchho-test run --reporter=junit --coverage
+
+# Watch for changes
+npx guchho-test watch
+```
+
 ## Exit codes
 
 | Code | Meaning                                                        |
@@ -157,3 +181,10 @@ With `--passWithNoTests`, an empty discovery or empty shard exits with code `0`.
 - `--bail` forces `maxWorkers` to `1`.
 - Results are reported in deterministic file order even when files finish out of
   order.
+
+## Related
+
+- [Configuration](./configuration.md)
+- [Watch Mode](./watch-mode.md)
+- [Coverage](./coverage.md)
+- [Reporters](./reporters.md)

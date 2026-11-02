@@ -1,12 +1,17 @@
 ---
 title: Coverage
 description: Collect V8 coverage, map it through source maps, and enforce thresholds.
+date: "2026-11-02"
 ---
 
 # Coverage
 
 Guchho Test collects coverage with the V8 inspector and maps results back to
 original source using inline source maps.
+
+Coverage is opt-in per run or per configuration. Reports can be written as text,
+HTML, JSON, LCOV, or Cobertura, and thresholds can fail the run with exit code
+`1` when they are not met.
 
 ## Enabling coverage
 
@@ -145,6 +150,13 @@ Coverage thresholds not met:
   src/math.ts: lines: 75.00% is below 90.00%
 ```
 
+## Best practices
+
+- Start with line coverage and add branch and function thresholds gradually.
+- Exclude generated files, fixtures, and build output from collection.
+- Treat coverage as a signal, not a target; focused assertions matter more.
+- Run the same coverage command locally and in CI.
+
 ## Exit codes and errors
 
 | Situation                                   | Exit code           |
@@ -161,3 +173,10 @@ Report writing errors are printed as `Failed to write coverage reports: ...`.
 TypeScript and JSX test/source files are transformed with inline source maps, so
 coverage offsets are mapped back to original file, line, and column. This keeps
 reports tied to source rather than generated output.
+
+## Related
+
+- [Configuration](./configuration.md)
+- [CLI Reference](./cli.md)
+- [Reporters](./reporters.md)
+- [TypeScript and JSX](./typescript.md)

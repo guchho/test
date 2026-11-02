@@ -1,12 +1,17 @@
 ---
 title: Writing Tests
 description: Register suites and tests, use modifiers, table-driven cases, and timeouts.
+date: "2026-11-02"
 ---
 
 # Writing Tests
 
 Guchho Test uses a suite/test registration API. Tests are registered when the
 file is loaded and executed afterwards by the runner.
+
+This page covers suite structure, table-driven cases, async tests, timeouts,
+selection modifiers, and file discovery. The patterns here apply equally to
+JavaScript and TypeScript test files.
 
 ## Basic structure
 
@@ -253,7 +258,23 @@ must exist and be files.
 Each test file runs in its own worker (thread by default, or child process with
 `--pool=forks`). Module state and globals do not leak between files.
 
+## Best practices
+
+- Keep each test focused on one behavior and one reason to fail.
+- Prefer `beforeEach` over shared mutable state so tests remain independent.
+- Use table-driven tests for input variants, not for unrelated assertions.
+- Await every promise returned by a test or hook; unawaited work can leak into
+  the next test.
+- Give tests descriptive names that state the expected behavior.
+
 ## What happens with no tests
 
 If a test file registers no tests, the CLI prints a warning. If discovery finds
 no test files at all, the run exits with code `2`.
+
+## Related
+
+- [Assertions](./assertions.md)
+- [Lifecycle Hooks](./lifecycle-hooks.md)
+- [Configuration](./configuration.md)
+- [CLI Reference](./cli.md)

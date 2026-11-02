@@ -1,12 +1,17 @@
 ---
 title: Reporters
 description: Built-in default, verbose, dot, JSON, JUnit, TAP, and GitHub reporters, plus custom reporters.
+date: "2026-11-02"
 ---
 
 # Reporters
 
 Reporters consume test results and write output. Select one built-in reporter
 with `--reporter`, or configure several with the `reporters` option.
+
+The default reporter is designed for humans, while machine-readable reporters
+keep stdout parseable for CI systems and downstream tools. Custom reporters can
+be supplied through plugins.
 
 ## Built-in reporters
 
@@ -111,6 +116,16 @@ export default defineConfig({
 
 A `--reporter` flag replaces the configured reporters with that single reporter.
 
+## Choosing a reporter
+
+| Context                    | Suggested reporter     |
+| -------------------------- | ---------------------- |
+| Local development          | `default` or `verbose` |
+| Minimal terminal output    | `dot`                  |
+| Programmatic parsing       | `json`                 |
+| CI test reporting          | `junit` or `tap`       |
+| GitHub Actions annotations | `github-actions`       |
+
 ## Reporter interface
 
 Custom reporters implement any of these optional methods:
@@ -198,3 +213,10 @@ Details:
 - Reporters receive events in file order.
 - With multiple reporters, all receive each event.
 - Reporters must not modify test execution; they only observe and write output.
+
+## Related
+
+- [CLI Reference](./cli.md)
+- [Configuration](./configuration.md)
+- [Coverage](./coverage.md)
+- [API Reference](./api.md)

@@ -1,6 +1,7 @@
 ---
 title: Assertions
 description: The expect API, value and async matchers, asymmetric matchers, and custom matchers.
+date: "2026-11-02"
 ---
 
 # Assertions
@@ -13,6 +14,11 @@ import { expect } from '@guchho/test';
 
 An assertion throws `AssertionError` when it fails. Failed assertions inside a
 test mark that test as failed.
+
+Matchers are grouped by purpose: value comparisons, asymmetric matching, mock
+inspection, snapshots, asynchronous resolution, soft assertions, and polling.
+Choose the narrowest matcher that expresses the intent so failures stay
+readable.
 
 ## Value matchers
 
@@ -320,6 +326,14 @@ dispose();
 
 `addEqualityTest` returns a function that removes the custom test.
 
+## Best practices
+
+- Assert behavior and observable output rather than implementation details.
+- Use `toBe` for primitives and `toEqual` for structural equality.
+- Prefer `resolves` and `rejects` over manual promise handling.
+- Use soft assertions only when you want to collect several failures at once.
+- Write custom matchers when a domain concept repeats across many tests.
+
 ## Assertion errors
 
 A failed assertion throws `AssertionError` (exported from the package):
@@ -330,3 +344,10 @@ import { AssertionError } from '@guchho/test';
 
 Messages are formatted with the matcher signature, expected value, received
 value, and, for deep equality, a line diff.
+
+## Related
+
+- [Writing Tests](./writing-tests.md)
+- [Mocking](./mocking.md)
+- [Snapshot Testing](./snapshot-testing.md)
+- [API Reference](./api.md)

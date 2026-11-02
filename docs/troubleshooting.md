@@ -1,9 +1,14 @@
 ---
 title: Troubleshooting
 description: Diagnose discovery, configuration, assertion, mocking, and coverage problems.
+date: "2026-11-02"
 ---
 
 # Troubleshooting
+
+Most problems fall into a small number of categories: discovery, configuration,
+asynchronous behavior, mocks, snapshots, coverage, and worker execution. Each
+section below lists the symptom, the likely cause, and the fix.
 
 ## `guchho-test: No test files found.`
 
@@ -127,6 +132,14 @@ maps are available for transformed files.
 Threshold failures print each metric below its target and exit with code `1`.
 Lower the threshold or add tests. Collection/reporting errors exit with code `2`.
 
+## Getting more detail
+
+- Run the failing file directly to remove sharding and worker variables.
+- Add `--reporter=verbose` to see per-test status and hook errors.
+- Use `--bail` to stop after the first failure while debugging.
+- Check the resolved configuration and the discovered file list before changing
+  test code.
+
 ## Worker crash or file failed to load
 
 The CLI prints `Failed to load test file "..."` or `Failed while executing "..."`
@@ -144,3 +157,10 @@ the machine-readable output.
 Each file runs in its own worker, so cross-file state should not leak. If tests
 within a file share state, make them independent or use lifecycle hooks to reset
 state. Use `--bail` only for fail-fast behavior; it also forces a single worker.
+
+## Related
+
+- [Configuration](./configuration.md)
+- [CLI Reference](./cli.md)
+- [Mocking](./mocking.md)
+- [Coverage](./coverage.md)

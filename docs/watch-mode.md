@@ -1,11 +1,16 @@
 ---
 title: Watch Mode
 description: Rerun affected tests when files change, with dependency tracking and debouncing.
+date: "2026-11-02"
 ---
 
 # Watch Mode
 
 Watch mode reruns only the tests affected by file changes.
+
+Watch mode keeps a run loop alive, reruns the tests affected by each change, and
+supports an interactive filter. It is intended for local development; CI should
+use a single `run` invocation.
 
 ```bash
 guchho-test watch
@@ -81,6 +86,13 @@ Press `Ctrl+C` (SIGINT), `q` in interactive mode, or send SIGTERM. The watcher
 aborts, closes the file watcher, waits for any in-flight run, and exits with code
 `0`.
 
+## Best practices
+
+- Keep test files and source files under the watched working directory.
+- Avoid generated output directories in `include` patterns.
+- Use the interactive filter to focus on one area while iterating.
+- Stop watch mode before running a full CI-style verification pass.
+
 ## Limitations
 
 - Watch mode uses `fs.watch` with `{ recursive: true }` and therefore relies on
@@ -89,3 +101,10 @@ aborts, closes the file watcher, waits for any in-flight run, and exits with cod
 - Test file selection still honors `--filter` and `--testNamePattern` through the
   normal runner options. An interactive `/` filter overrides `--filter` until it
   is cleared.
+
+## Related
+
+- [CLI Reference](./cli.md)
+- [Configuration](./configuration.md)
+- [Writing Tests](./writing-tests.md)
+- [Coverage](./coverage.md)

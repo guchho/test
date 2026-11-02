@@ -1,12 +1,17 @@
 ---
 title: Configuration
 description: Discover and configure guchho.test.config files, options, and CLI precedence.
+date: "2026-11-02"
 ---
 
 # Configuration
 
 Guchho Test discovers a configuration file automatically, or you can pass one
 explicitly with `--config`.
+
+Configuration controls discovery, execution, reporting, coverage, and plugin
+loading. CLI options take precedence over file values, and unknown or invalid
+values are rejected with a clear error rather than silently ignored.
 
 ## File names
 
@@ -231,6 +236,22 @@ Default coverage exclude:
 **/coverage/**
 ```
 
+## Recommended baseline
+
+Start with the defaults and add options only when the project needs them:
+
+```js
+import { defineConfig } from '@guchho/test';
+
+export default defineConfig({
+  include: ['src/**/*.test.js'],
+  timeout: 5000,
+  reporters: ['default'],
+});
+```
+
+Add coverage thresholds and additional reporters once the suite is stable.
+
 ## Defaults
 
 | Option               | Default                                                |
@@ -281,3 +302,10 @@ Discovery uses a small glob implementation supporting:
 - `{a,b}` — alternatives.
 
 Patterns are matched against POSIX-style relative paths.
+
+## Related
+
+- [CLI Reference](./cli.md)
+- [Writing Tests](./writing-tests.md)
+- [Coverage](./coverage.md)
+- [Reporters](./reporters.md)

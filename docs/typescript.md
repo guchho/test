@@ -1,11 +1,16 @@
 ---
 title: TypeScript and JSX
 description: Run TypeScript, JSX/TSX, and ESM or CommonJS test files with source maps.
+date: "2026-11-02"
 ---
 
 # TypeScript and JSX
 
 Guchho Test supports JavaScript, TypeScript, and JSX/TSX test files.
+
+TypeScript and JSX are transformed on load, so test files do not need a separate
+build step. Inline source maps keep stack traces, coverage, and snapshots tied
+to the original source.
 
 ## Supported extensions
 
@@ -140,8 +145,22 @@ under `dist/`. Consumers get types through the package export map:
 }
 ```
 
+## Best practices
+
+- Use the same module format and path aliases as the application.
+- Keep type-only imports explicit so transformation stays predictable.
+- Run `tsc --noEmit` separately when full type checking is required.
+- Prefer `.ts` or `.tsx` test files in TypeScript projects.
+
 ## Requirements
 
 - Node.js `>=20.19.0` (required for stable loader behavior used by the
   transformer and module mocks).
 - TypeScript `^5.7.0` is used by the transformer.
+
+## Related
+
+- [Configuration](./configuration.md)
+- [Coverage](./coverage.md)
+- [Snapshots in TypeScript](./snapshot-testing.md)
+- [API Reference](./api.md)

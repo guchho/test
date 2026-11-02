@@ -1,11 +1,16 @@
 ---
 title: Snapshot Testing
 description: Capture and compare external and inline snapshots with deterministic serialization.
+date: "2026-11-02"
 ---
 
 # Snapshot Testing
 
 Snapshots capture a serialized value and compare it on later runs.
+
+Snapshots are useful for structured output, rendered markup, and large values
+that are easier to review as a file than as inline assertions. They are not a
+substitute for focused assertions about behavior.
 
 ```js
 import { expect, it } from '@guchho/test';
@@ -168,7 +173,22 @@ expect(value).not.toMatchSnapshot();
 expect(value).not.toMatchInlineSnapshot('...');
 ```
 
+## Best practices
+
+- Keep snapshots small enough to review in a pull request.
+- Commit external snapshot files with the tests that produce them.
+- Use property matchers for values that legitimately change between runs.
+- Review snapshot updates instead of accepting them blindly.
+- Remove snapshot files when the related tests are deleted.
+
 ## Snapshots and workers
 
 Each test file runs in its own worker, so snapshot state and external snapshot
 writes are scoped to that file.
+
+## Related
+
+- [Assertions](./assertions.md)
+- [Writing Tests](./writing-tests.md)
+- [Configuration](./configuration.md)
+- [CLI Reference](./cli.md)

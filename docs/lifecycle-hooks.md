@@ -1,6 +1,7 @@
 ---
 title: Lifecycle Hooks
 description: Run setup and teardown code around suites and tests with before/after hooks.
+date: "2026-11-02"
 ---
 
 # Lifecycle Hooks
@@ -10,6 +11,10 @@ Hooks run around suites and tests. Import them from `@guchho/test`:
 ```js
 import { beforeAll, beforeEach, afterEach, afterAll } from '@guchho/test';
 ```
+
+Hooks are registered inside a suite and apply to that suite and its descendants.
+Use them to create fixtures, reset shared state, and release resources in a
+predictable order.
 
 ## Scope
 
@@ -101,6 +106,15 @@ describe('files', () => {
 });
 ```
 
+## Best practices
+
+- Keep hooks small and deterministic; they run for every matching test.
+- Create expensive resources in `beforeAll` and release them in `afterAll`.
+- Reset mutable state in `beforeEach` and `afterEach` so tests stay isolated.
+- Return or await promises from async hooks.
+- Avoid assertions in cleanup hooks unless the assertion is the point of the
+  hook.
+
 ## Hook errors in reporters
 
 Reporters receive hook errors through `onHookError(error, display)`. Each error
@@ -111,3 +125,10 @@ includes:
 | `type`  | `beforeAll`, `afterAll`, `beforeEach`, or `afterEach`. |
 | `suite` | Suite full name, or `<root>`.                          |
 | `error` | The thrown value.                                      |
+
+## Related
+
+- [Writing Tests](./writing-tests.md)
+- [Mocking](./mocking.md)
+- [Configuration](./configuration.md)
+- [Reporters](./reporters.md)

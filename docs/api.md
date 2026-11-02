@@ -1,6 +1,7 @@
 ---
 title: API Reference
 description: Runtime exports, types, test options, and the programmatic runTests API.
+date: "2026-11-02"
 ---
 
 # API Reference
@@ -29,6 +30,17 @@ import {
 ```
 
 Configuration helpers and defaults are also available from `@guchho/test/config`.
+
+The package exposes test registration, assertions, mocks, lifecycle hooks,
+configuration helpers, plugin and reporter factories, the programmatic
+`runTests` API, and public types. Everything else is internal.
+
+## Choosing an entry point
+
+- Import runtime APIs from `@guchho/test`.
+- Import configuration helpers and defaults from `@guchho/test/config`.
+- Use `runTests` when embedding the runner in another tool.
+- Import types with `import type` to avoid runtime work.
 
 ## Test registration
 
@@ -577,3 +589,10 @@ Plus the config types listed above.
 
 Only the package root and `@guchho/test/config` are public entry points. Other
 modules under `dist` are internal and may change without notice.
+
+## Related
+
+- [Writing Tests](./writing-tests.md)
+- [Assertions](./assertions.md)
+- [Configuration](./configuration.md)
+- [Reporters](./reporters.md)

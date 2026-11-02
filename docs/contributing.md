@@ -1,9 +1,14 @@
 ---
 title: Contributing
 description: Repository layout, development workflow, testing, and release process.
+date: "2026-11-02"
 ---
 
 # Contributing
+
+Contributions should keep the runner deterministic, dependency-light, and
+documented. This page describes the repository layout, local setup, coding
+conventions, test expectations, and release process.
 
 ## Repository layout
 
@@ -126,3 +131,16 @@ Releases are cut only with explicit approval. The release checklist lives in
 full verification pass, CI validation, and a package content audit.
 
 Do not publish to npm or create a public release without permission.
+
+## Getting help
+
+- Open an issue for bugs, behavior changes, or documentation gaps.
+- Discuss larger changes before implementing them.
+- Include a minimal reproduction and the relevant command output.
+
+## Related
+
+- [Writing Tests](./writing-tests.md)
+- [Configuration](./configuration.md)
+- [API Reference](./api.md)
+- [CLI Reference](./cli.md)
