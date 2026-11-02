@@ -1,3 +1,8 @@
+---
+title: Coverage
+description: Collect V8 coverage, map it through source maps, and enforce thresholds.
+---
+
 # Coverage
 
 Guchho Test collects coverage with the V8 inspector and maps results back to
