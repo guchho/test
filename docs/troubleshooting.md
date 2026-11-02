@@ -1,3 +1,8 @@
+---
+title: Troubleshooting
+description: Diagnose discovery, configuration, assertion, mocking, and coverage problems.
+---
+
 # Troubleshooting
 
 ## `guchho-test: No test files found.`
