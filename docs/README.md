@@ -2,6 +2,10 @@
 title: Guchho Test
 description: Fast, ESM-first JavaScript and TypeScript testing framework for the Guchho ecosystem.
 date: "2026-11-02"
+banner: /test-og.png
+bannerAlt: Guchho Test — fast, ESM-first JavaScript and TypeScript testing
+bannerWidth: 1200
+bannerHeight: 630
 ---
 
 # Guchho Test Documentation
