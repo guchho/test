@@ -1,12 +1,24 @@
-export type ReporterName = 'default' | 'verbose' | 'dot' | 'json' | 'junit';
+export type ReporterName =
+  | 'default'
+  | 'verbose'
+  | 'dot'
+  | 'json'
+  | 'junit'
+  | 'tap'
+  | 'github'
+  | 'github-actions';
 
-export type CoverageReporterName = 'text' | 'html' | 'json';
+export type CoverageReporterName =
+  'text' | 'html' | 'json' | 'lcov' | 'cobertura';
+
+export type EnvironmentName = 'node' | 'jsdom' | 'happy-dom';
 
 export interface CoverageThresholds {
   lines?: number;
   functions?: number;
   branches?: number;
   statements?: number;
+  perFile?: boolean;
 }
 
 export interface CoverageConfig {
@@ -34,5 +46,9 @@ export interface GuchhoConfig {
   setupFilesAfterEnv?: string[];
   globalSetup?: string;
   globalTeardown?: string;
+  environment?: EnvironmentName;
+  environmentOptions?: Record<string, unknown>;
+  globals?: boolean;
+  tsconfig?: string;
   coverage?: CoverageConfig;
 }
