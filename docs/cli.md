@@ -1,3 +1,8 @@
+---
+title: CLI Reference
+description: Commands, options, filters, reporters, and exit codes for the guchho-test binary.
+---
+
 # CLI Reference
 
 The command-line binary is `guchho-test`.
