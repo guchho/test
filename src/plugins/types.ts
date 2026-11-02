@@ -1,7 +1,4 @@
-import type {
-  Reporter,
-  ReporterIO,
-} from '../reporters/types.js';
+import type { Reporter, ReporterIO } from '../reporters/types.js';
 
 export type ReporterFactory = (
   options: Record<string, unknown>,
