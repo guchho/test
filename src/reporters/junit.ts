@@ -1,11 +1,6 @@
 import { formatError } from '../runner/errors.js';
 import type { HookError, TestResult } from '../runner/types.js';
-import type {
-  FileReport,
-  Reporter,
-  ReporterIO,
-  RunReport,
-} from './types.js';
+import type { FileReport, Reporter, ReporterIO, RunReport } from './types.js';
 
 function seconds(milliseconds: number): string {
   return (milliseconds / 1000).toFixed(3);
@@ -101,8 +96,7 @@ export function createJUnitReporter(io: ReporterIO): Reporter {
         (count, file) =>
           count +
           file.results.filter(
-            (result) =>
-              result.status === 'skipped' || result.status === 'todo',
+            (result) => result.status === 'skipped' || result.status === 'todo',
           ).length,
         0,
       );
