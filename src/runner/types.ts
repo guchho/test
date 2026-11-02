@@ -1,4 +1,5 @@
-export type TestMode = 'normal' | 'skip' | 'only' | 'todo' | 'fails' | 'concurrent';
+export type TestMode =
+  'normal' | 'skip' | 'only' | 'todo' | 'fails' | 'concurrent';
 
 export type TestStatus = 'passed' | 'failed' | 'skipped' | 'todo';
 
