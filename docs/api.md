@@ -1,3 +1,8 @@
+---
+title: API Reference
+description: Runtime exports, types, test options, and the programmatic runTests API.
+---
+
 # API Reference
 
 All runtime APIs are imported from the package root:
