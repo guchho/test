@@ -1,3 +1,8 @@
+---
+title: Reporters
+description: Built-in default, verbose, dot, JSON, JUnit, TAP, and GitHub reporters, plus custom reporters.
+---
+
 # Reporters
 
 Reporters consume test results and write output. Select one built-in reporter
