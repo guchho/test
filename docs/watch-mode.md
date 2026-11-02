@@ -1,3 +1,8 @@
+---
+title: Watch Mode
+description: Rerun affected tests when files change, with dependency tracking and debouncing.
+---
+
 # Watch Mode
 
 Watch mode reruns only the tests affected by file changes.
