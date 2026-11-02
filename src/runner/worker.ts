@@ -3,8 +3,10 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { CoverageCollector } from '../coverage/collect-worker.js';
 import { pathToFileURL } from 'node:url';
 
+import { installEnvironment } from '../environment/index.js';
 import { resetModuleMocks, setCurrentTestFile } from '../mock/module.js';
-import { configureSnapshots } from '../snapshot/session.js';
+import { configureSnapshots, finalizeSnapshots } from '../snapshot/session.js';
+import { installGlobals, removeGlobals } from './globals.js';
 import { registerTypeScriptLoader } from '../transform/register.js';
 import {
   getRegisteredTestCount,
@@ -12,10 +14,7 @@ import {
   resetRegistry,
 } from './registry.js';
 import { runSuite } from './executor.js';
-import {
-  serializeError,
-  serializeRunResult,
-} from './serialize.js';
+import { serializeError, serializeRunResult } from './serialize.js';
 import type { WorkerInput, WorkerOutcome } from './serialize.js';
 
 function decodeForkInput(): WorkerInput {
@@ -28,6 +27,46 @@ function decodeForkInput(): WorkerInput {
   return JSON.parse(
     Buffer.from(encoded, 'base64url').toString('utf8'),
   ) as WorkerInput;
+}
+
+const consoleMethods = [
+  'log',
+  'info',
+  'warn',
+  'error',
+  'debug',
+  'trace',
+  'dir',
+  'dirxml',
+  'table',
+  'group',
+  'groupCollapsed',
+  'groupEnd',
+  'time',
+  'timeEnd',
+  'timeLog',
+  'count',
+  'countReset',
+  'assert',
+  'clear',
+] as const;
+
+function silenceConsole(): () => void {
+  const target = console as unknown as Record<string, unknown>;
+  const saved = new Map<string, unknown>();
+
+  for (const method of consoleMethods) {
+    if (typeof target[method] === 'function') {
+      saved.set(method, target[method]);
+      target[method] = (): void => {};
+    }
+  }
+
+  return (): void => {
+    for (const [method, value] of saved) {
+      target[method] = value;
+    }
+  };
 }
 
 function resolveInput(): WorkerInput {
@@ -43,7 +82,10 @@ async function execute(input: WorkerInput): Promise<WorkerOutcome> {
     process.setSourceMapsEnabled(true);
   }
 
-  registerTypeScriptLoader();
+  registerTypeScriptLoader({
+    tsconfig: input.tsconfig,
+    cwd: process.cwd(),
+  });
   resetRegistry();
   resetModuleMocks();
   setCurrentTestFile(input.file);
@@ -52,11 +94,33 @@ async function execute(input: WorkerInput): Promise<WorkerOutcome> {
     update: input.updateSnapshots === true,
   });
 
-  const collector = input.coverage ? await CoverageCollector.start() : undefined;
+  const collector = input.coverage
+    ? await CoverageCollector.start()
+    : undefined;
   let outcome: WorkerOutcome;
 
   try {
-    outcome = await runTests(input);
+    const environment = await installEnvironment(
+      input.environment,
+      input.environmentOptions,
+    );
+    if (input.globals) {
+      installGlobals();
+    }
+
+    const restoreConsole = input.silent ? silenceConsole() : undefined;
+
+    try {
+      outcome = await runTests(input);
+    } finally {
+      restoreConsole?.();
+
+      if (input.globals) {
+        removeGlobals();
+      }
+
+      environment.teardown();
+    }
   } finally {
     if (collector !== undefined) {
       // Collected after the test module and its dependencies run.
@@ -80,7 +144,9 @@ async function loadSetupFiles(
         error instanceof Error
           ? (error.stack ?? error.message)
           : serializeError(error).inspected;
-      throw new Error(`Failed to load ${label} "${file}":\n${detail}`);
+      throw new Error(`Failed to load ${label} "${file}":\n${detail}`, {
+        cause: error,
+      });
     }
   }
 }
@@ -119,10 +185,19 @@ async function runTests(input: WorkerInput): Promise<WorkerOutcome> {
     bail: input.bail,
   });
 
+  const snapshots = finalizeSnapshots({
+    prune:
+      input.updateSnapshots &&
+      input.filter === undefined &&
+      input.testNamePattern === undefined,
+  });
+
   return {
     kind: 'result',
     file: input.file,
     result: serializeRunResult(result, getRegisteredTestCount()),
+    obsoleteSnapshots: snapshots.obsolete,
+    prunedSnapshots: snapshots.pruned,
   };
 }
 
