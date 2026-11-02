@@ -1,6 +1,7 @@
 export { defineConfig } from './define-config.js';
 export {
   defaultConfig,
+  defaultEnvironment,
   defaultExclude,
   defaultInclude,
   defaultTimeout,
@@ -9,6 +10,7 @@ export type {
   CoverageConfig,
   CoverageReporterName,
   CoverageThresholds,
+  EnvironmentName,
   GuchhoConfig,
   ReporterEntry,
   ReporterName,
