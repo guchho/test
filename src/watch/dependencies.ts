@@ -90,10 +90,7 @@ function isSourceFile(filePath: string): boolean {
   return sourceExtensions.includes(path.extname(filePath));
 }
 
-async function scanFile(
-  filePath: string,
-  visited: Set<string>,
-): Promise<void> {
+async function scanFile(filePath: string, visited: Set<string>): Promise<void> {
   const normalized = normalizeWatchPath(filePath);
 
   if (visited.has(normalized) || !isSourceFile(filePath)) {
