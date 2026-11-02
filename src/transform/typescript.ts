@@ -40,10 +40,7 @@ function formatDiagnostics(diagnostics: readonly ts.Diagnostic[]): string {
     .join('\n');
 }
 
-export function transformTypeScript(
-  source: string,
-  fileName: string,
-): string {
+export function transformTypeScript(source: string, fileName: string): string {
   const moduleFormat = moduleFormatFor(fileName);
   const result = ts.transpileModule(source, {
     fileName,
