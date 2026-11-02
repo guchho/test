@@ -97,7 +97,7 @@ function htmlReport(report: CoverageReport, cwd: string): string {
 
   const sections = report.files
     .map((file) => {
-      let source = '';
+      let source: string;
       try {
         source = readFileSync(path.resolve(cwd, file.path), 'utf8');
       } catch {
@@ -171,6 +171,75 @@ function jsonReport(report: CoverageReport): string {
   )}\n`;
 }
 
+function sortedLineHits(file: FileCoverage): [number, boolean][] {
+  return Object.entries(file.lineHits)
+    .map(([line, hit]) => [Number(line), hit] as [number, boolean])
+    .sort((left, right) => left[0] - right[0]);
+}
+
+function lcovReport(report: CoverageReport): string {
+  const lines: string[] = [];
+
+  for (const file of report.files) {
+    lines.push('TN:');
+    lines.push(`SF:${file.path}`);
+    lines.push(`FNF:${file.functions.total}`);
+    lines.push(`FNH:${file.functions.covered}`);
+    lines.push(`BRF:${file.branches.total}`);
+    lines.push(`BRH:${file.branches.covered}`);
+
+    for (const [line, hit] of sortedLineHits(file)) {
+      lines.push(`DA:${line},${hit ? 1 : 0}`);
+    }
+
+    lines.push(`LF:${file.lines.total}`);
+    lines.push(`LH:${file.lines.covered}`);
+    lines.push('end_of_record');
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+function coverageRate(metric: CoverageMetric): string {
+  return (coveragePercentage(metric) / 100).toFixed(4);
+}
+
+function coberturaReport(report: CoverageReport, cwd: string): string {
+  const files = report.files
+    .map((file) => {
+      const lineHits = sortedLineHits(file)
+        .map(
+          ([line, hit]) =>
+            `        <line number="${line}" hits="${hit ? 1 : 0}"/>`,
+        )
+        .join('\n');
+
+      return `      <class name="${escapeHtml(file.path)}" filename="${escapeHtml(file.path)}" line-rate="${coverageRate(file.lines)}" branch-rate="${coverageRate(file.branches)}" complexity="0">
+        <methods/>
+        <lines>
+${lineHits}
+        </lines>
+      </class>`;
+    })
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
+<coverage line-rate="${coverageRate(report.totals.lines)}" branch-rate="${coverageRate(report.totals.branches)}" lines-covered="${report.totals.lines.covered}" lines-valid="${report.totals.lines.total}" branches-covered="${report.totals.branches.covered}" branches-valid="${report.totals.branches.total}" complexity="0" version="0.0.1" timestamp="${Date.now()}">
+  <sources>
+    <source>${escapeHtml(cwd)}</source>
+  </sources>
+  <packages>
+    <package name="guchho-test" line-rate="${coverageRate(report.totals.lines)}" branch-rate="${coverageRate(report.totals.branches)}" complexity="0">
+      <classes>
+${files}
+      </classes>
+    </package>
+  </packages>
+</coverage>
+`;
+}
+
 export function writeCoverageReport(
   report: CoverageReport,
   config: Readonly<CoverageConfig>,
@@ -198,6 +267,20 @@ export function writeCoverageReport(
         jsonReport(report),
         'utf8',
       );
+    } else if (reporter === 'lcov') {
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        path.join(directory, 'lcov.info'),
+        lcovReport(report),
+        'utf8',
+      );
+    } else if (reporter === 'cobertura') {
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        path.join(directory, 'cobertura-coverage.xml'),
+        coberturaReport(report, cwd),
+        'utf8',
+      );
     }
   }
 
@@ -211,18 +294,21 @@ export function writeCoverageReport(
   }
 }
 
+const coverageMetrics = [
+  'statements',
+  'branches',
+  'functions',
+  'lines',
+] as const;
+
+type CoverageMetricName = (typeof coverageMetrics)[number];
+
 export interface ThresholdFailure {
-  readonly metric: keyof typeof metricsMap;
+  readonly metric: CoverageMetricName;
   readonly expected: number;
   readonly actual: number;
+  readonly file?: string;
 }
-
-const metricsMap = {
-  lines: 'lines',
-  functions: 'functions',
-  branches: 'branches',
-  statements: 'statements',
-} as const;
 
 export function checkThresholds(
   report: CoverageReport,
@@ -234,16 +320,38 @@ export function checkThresholds(
   }
 
   const failures: ThresholdFailure[] = [];
+  const targets =
+    thresholds.perFile === true
+      ? report.files.map((file) => ({
+          file: file.path,
+          metrics: file as Partial<Record<CoverageMetricName, CoverageMetric>>,
+        }))
+      : [
+          {
+            file: undefined,
+            metrics: report.totals as Partial<
+              Record<CoverageMetricName, CoverageMetric>
+            >,
+          },
+        ];
 
-  for (const metric of Object.keys(metricsMap) as (keyof typeof metricsMap)[]) {
-    const expected = thresholds[metric];
-    if (expected === undefined) {
-      continue;
-    }
+  for (const target of targets) {
+    for (const metric of coverageMetrics) {
+      const expected = thresholds[metric];
+      const value = target.metrics[metric];
+      if (expected === undefined || value === undefined) {
+        continue;
+      }
 
-    const actual = coveragePercentage(report.totals[metric]);
-    if (actual + Number.EPSILON < expected) {
-      failures.push({ metric, expected, actual });
+      const actual = coveragePercentage(value);
+      if (actual + Number.EPSILON < expected) {
+        failures.push({
+          metric,
+          expected,
+          actual,
+          ...(target.file === undefined ? {} : { file: target.file }),
+        });
+      }
     }
   }
 
