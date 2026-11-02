@@ -15,8 +15,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   run in the main process.
 - `--shard=<index>/<count>` to split test files deterministically across CI
   jobs.
+- `--changed` and `--related` test selection using git changes and the local
+  dependency graph.
+- `--listTests` to print selected test files without executing them.
+- `--passWithNoTests` to allow empty test selections.
+- `--silent` to suppress console output from test files.
+- TAP and GitHub Actions annotation reporters through `--reporter=tap`,
+  `--reporter=github`, and `--reporter=github-actions`.
+- Interactive watch mode keys: rerun all, filter, clear filter, and quit.
+- `lcov` and `cobertura` coverage reporters.
+- Per-file coverage thresholds through `coverage.thresholds.perFile`.
 - Soft assertions with `expect.soft`.
 - Polling assertions with `expect.poll`.
+- Fake timers through `mock.useFakeTimers`, `advanceTimersByTime`,
+  `advanceTimersToNextTimer`, `runAllTimers`, `runOnlyPendingTimers`,
+  `setSystemTime`, and related helpers.
+- TypeScript path alias resolution from `compilerOptions.paths`, with automatic
+  `tsconfig.json` discovery and the `tsconfig` configuration option.
+- Optional `jsdom` and `happy-dom` test environments through the `environment`
+  and `environmentOptions` configuration options.
+- Jest-compatible globals mode with `globals: true`.
+- In-process runner API exported as `runTests`.
+- CommonJS `require()` interception for `mock.module()`.
+- Snapshot property matchers for `toMatchSnapshot` and `toMatchInlineSnapshot`.
+- Obsolete snapshot warnings and pruning with `--update`, skipped when a filter
+  is active.
+- CI workflow matrix covering Linux, macOS, and Windows across Node.js 20, 22,
+  and 24.
+- Replaced ESLint with `guchho lint` and committed Prettier configuration with
+  lint, format, and formatting-check scripts.
+- Weekly Dependabot updates for npm packages and GitHub Actions.
+- Coverage upload to Codecov from CI.
+- Documentation link checking for relative files and heading anchors.
+
+### Changed
+
+- Updated TypeScript to `^5.9.3` and `@types/node` to the Node.js 24 line.
+- Moved `remove-item` to `devDependencies`.
+- Normalized text files to LF line endings through `.gitattributes`.
 
 ## [0.0.1] - 2026-10-31
 
