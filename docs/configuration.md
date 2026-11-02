@@ -1,3 +1,8 @@
+---
+title: Configuration
+description: Discover and configure guchho.test.config files, options, and CLI precedence.
+---
+
 # Configuration
 
 Guchho Test discovers a configuration file automatically, or you can pass one
