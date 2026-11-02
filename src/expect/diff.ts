@@ -40,11 +40,7 @@ export function formatDiff(expected: string, received: string): string {
     const expectedLine = expectedLines[row - 1];
     const receivedLine = receivedLines[column - 1];
 
-    if (
-      row > 0 &&
-      column > 0 &&
-      expectedLine === receivedLine
-    ) {
+    if (row > 0 && column > 0 && expectedLine === receivedLine) {
       lines.push(`  ${expectedLine ?? ''}`);
       row -= 1;
       column -= 1;
