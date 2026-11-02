@@ -1,4 +1,12 @@
 import { mockModule } from './module.js';
+import { fakeTimers } from './timers.js';
+import type { FakeTimerApi } from './timers.js';
+
+export type {
+  FakeTimerApi,
+  FakeTimerInstallOptions,
+  FakeTimerName,
+} from './timers.js';
 
 export interface MockResult {
   readonly type: 'return' | 'throw';
@@ -34,14 +42,12 @@ export interface MockFunction<
   mockReturnValue(value: TReturn): MockFunction<TArgs, TReturn>;
   mockReturnValueOnce(value: TReturn): MockFunction<TArgs, TReturn>;
   mockResolvedValue(value: Awaited<TReturn>): MockFunction<TArgs, TReturn>;
-  mockResolvedValueOnce(
-    value: Awaited<TReturn>,
-  ): MockFunction<TArgs, TReturn>;
+  mockResolvedValueOnce(value: Awaited<TReturn>): MockFunction<TArgs, TReturn>;
   mockRejectedValue(reason: unknown): MockFunction<TArgs, TReturn>;
   mockRejectedValueOnce(reason: unknown): MockFunction<TArgs, TReturn>;
 }
 
-export interface MockApi {
+export interface MockApi extends FakeTimerApi {
   fn<TArgs extends unknown[] = unknown[], TReturn = unknown>(
     implementation?: (...args: TArgs) => TReturn,
   ): MockFunction<TArgs, TReturn>;
@@ -78,8 +84,7 @@ let invocationCounter = 0;
 
 function isObjectLike(value: unknown): value is object {
   return (
-    (typeof value === 'object' && value !== null) ||
-    typeof value === 'function'
+    (typeof value === 'object' && value !== null) || typeof value === 'function'
   );
 }
 
@@ -100,10 +105,7 @@ function createMock<TArgs extends unknown[], TReturn>(
     restore,
   };
 
-  const mockFunction = function (
-    this: unknown,
-    ...args: unknown[]
-  ): unknown {
+  const mockFunction = function (this: unknown, ...args: unknown[]): unknown {
     const constructing = new.target !== undefined;
 
     internal.calls.push(args);
@@ -261,9 +263,8 @@ function createMock<TArgs extends unknown[], TReturn>(
   >;
 
   if (restore !== undefined) {
-    const originalPrototype = (
-      original as { prototype?: unknown } | undefined
-    )?.prototype;
+    const originalPrototype = (original as { prototype?: unknown } | undefined)
+      ?.prototype;
     if (originalPrototype !== undefined) {
       (mockFunction as { prototype?: unknown }).prototype = originalPrototype;
     }
@@ -377,6 +378,7 @@ export function spyOn<T extends object, K extends keyof T>(
   } catch (error) {
     throw new TypeError(
       `Cannot spy on property "${String(key)}": ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 
@@ -388,6 +390,7 @@ export function isMockFunction(value: unknown): value is MockFunction {
 }
 
 export const mock: MockApi = {
+  ...fakeTimers,
   fn,
   spyOn,
   clearAll(): void {
