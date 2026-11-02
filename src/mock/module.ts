@@ -62,6 +62,7 @@ const reservedWords = new Set([
 let currentTestFile: string | undefined;
 let registryPath: string | undefined;
 let loaderRegistered = false;
+let requireHookInstalled = false;
 let mockCounter = 0;
 
 const registeredModules = new Map<string, RegisteredModuleMock>();
@@ -105,9 +106,7 @@ function findCallerFile(): string | undefined {
         continue;
       }
 
-      return fileName.startsWith('file:')
-        ? fileURLToPath(fileName)
-        : fileName;
+      return fileName.startsWith('file:') ? fileURLToPath(fileName) : fileName;
     }
   } finally {
     Error.prepareStackTrace = originalPrepare;
@@ -153,10 +152,7 @@ interface InlineLoadResult {
   readonly shortCircuit?: boolean;
 }
 
-type NextResolve = (
-  specifier: string,
-  context: unknown,
-) => InlineResolveResult;
+type NextResolve = (specifier: string, context: unknown) => InlineResolveResult;
 
 type NextLoad = (url: string, context: unknown) => InlineLoadResult;
 
@@ -269,6 +265,66 @@ function ensureLoader(): void {
   loaderRegistered = true;
 }
 
+type RequireLoad = (
+  this: unknown,
+  request: string,
+  parent: unknown,
+  isMain: boolean,
+) => unknown;
+
+interface CommonJsModuleApi {
+  _load?: RequireLoad;
+  _resolveFilename?: (request: string, parent: unknown) => string;
+}
+
+function installRequireHook(): void {
+  if (requireHookInstalled) {
+    return;
+  }
+
+  const commonJs = nodeModule.createRequire(import.meta.url)(
+    'node:module',
+  ) as CommonJsModuleApi;
+  const originalLoad = commonJs._load;
+  const resolveFilename = commonJs._resolveFilename;
+
+  if (
+    typeof originalLoad !== 'function' ||
+    typeof resolveFilename !== 'function'
+  ) {
+    return;
+  }
+
+  commonJs._load = function (
+    this: unknown,
+    request: string,
+    parent: unknown,
+    isMain: boolean,
+  ): unknown {
+    let resolved: string | undefined;
+
+    try {
+      resolved = resolveFilename.call(commonJs, request, parent);
+    } catch {
+      resolved = undefined;
+    }
+
+    if (resolved !== undefined) {
+      const entry = registeredModules.get(pathToFileURL(resolved).href);
+      if (entry !== undefined) {
+        const exports = getMainRegistry().get(entry.id);
+        if (exports !== undefined) {
+          return exports;
+        }
+      }
+    }
+
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  requireHookInstalled = true;
+}
+
 function writeRegistry(): void {
   if (registryPath === undefined) {
     return;
@@ -295,6 +351,7 @@ function mockModule(
   }
 
   ensureLoader();
+  installRequireHook();
 
   const exports = factory();
   if (exports === null || typeof exports !== 'object') {
