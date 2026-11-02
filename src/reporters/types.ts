@@ -1,8 +1,4 @@
-import type {
-  HookError,
-  RunSummary,
-  TestResult,
-} from '../runner/types.js';
+import type { HookError, RunSummary, TestResult } from '../runner/types.js';
 
 export interface ReporterIO {
   readonly stdout: (text: string) => void;
