@@ -69,11 +69,15 @@ describe('calculator', () => {
 });
 ```
 
+Set `globals: true` in configuration to use Jest-compatible globals instead.
+This installs `describe`, `it`, `expect`, `mock`, `jest`, hooks, and the usual
+aliases for each test file and removes them afterwards.
+
 `suite` is an alias for `describe`, and `test` is an alias for `it`.
 
 ### Nested suites
 
-Suites can be nested. Full test names are joined with ` > `.
+Suites can be nested. Full test names are joined with `>`.
 
 ```js
 import { describe, it, expect } from '@guchho/test';
@@ -168,9 +172,13 @@ it.skipIf(process.env.CI === 'true')('runs locally only', () => {});
 Retry a flaky test with the `retry` option or the `it.retry` modifier:
 
 ```js
-it('eventually succeeds', async () => {
-  await flakyOperation();
-}, { retry: 2 });
+it(
+  'eventually succeeds',
+  async () => {
+    await flakyOperation();
+  },
+  { retry: 2 },
+);
 
 it.retry(2)('also retries twice', async () => {
   await flakyOperation();
@@ -301,7 +309,8 @@ expect.extend({
   toBeEven(received) {
     return {
       pass: typeof received === 'number' && received % 2 === 0,
-      message: () => `Expected ${this.utils.printReceived(received)} to be even.`,
+      message: () =>
+        `Expected ${this.utils.printReceived(received)} to be even.`,
     };
   },
 });
@@ -373,6 +382,18 @@ External snapshots are stored in `__snapshots__/<test-file>.snap`. Inline
 snapshots are written directly into the test source, including TypeScript files
 with source maps. Values are serialized deterministically with sorted object
 keys, so snapshots are stable across runs.
+
+Use property matchers for values that change between runs:
+
+```js
+expect({ id: 42, name: 'Ada' }).toMatchSnapshot({
+  id: expect.any(Number),
+});
+```
+
+Snapshots that are no longer referenced are reported as obsolete after a test
+file finishes. Obsolete snapshots do not fail the run; `--update` removes them
+unless a filter is active.
 
 Create missing snapshots and update changed ones with:
 
@@ -462,6 +483,23 @@ fn.mockReset(); // Clears calls and restores the original implementation.
 `mock.clearAll()`, `mock.resetAll()`, and `mock.restoreAll()` apply the same
 operations to all registered mocks.
 
+### Fake timers
+
+```js
+mock.useFakeTimers();
+const callback = mock.fn();
+setTimeout(callback, 1000);
+
+mock.advanceTimersByTime(1000);
+expect(callback).toHaveBeenCalledTimes(1);
+
+mock.useRealTimers();
+```
+
+`mock` also provides `advanceTimersToNextTimer`, `runAllTimers`,
+`runOnlyPendingTimers`, `setSystemTime`, `getTimerCount`, and
+`clearAllTimers`.
+
 ## Module mocking
 
 ```js
@@ -482,6 +520,7 @@ Supported scenarios:
 
 - Relative paths, absolute paths, and `file:` URLs.
 - Existing ESM files with named exports and an optional default export.
+- Existing CommonJS files loaded through `require()`.
 - Mock registration and reset between test files when run through the CLI.
 
 Limitations:
@@ -492,7 +531,6 @@ Limitations:
   returned object are not reflected by the mocked module.
 - `mock.module()` cannot affect static imports that are evaluated before the
   registration runs.
-- CommonJS `require()` interception is not provided.
 
 ## Configuration
 
@@ -518,8 +556,16 @@ export default defineConfig({
   exclude: ['**/node_modules/**', '**/dist/**'],
   timeout: 5000,
   reporters: ['default'],
+  environment: 'node',
+  globals: false,
+  tsconfig: './tsconfig.json',
 });
 ```
+
+`environment` may be `'node'`, `'jsdom'`, or `'happy-dom'`. The DOM environments
+are optional peer dependencies; install the one you use. `tsconfig` selects the
+file used for path alias resolution and defaults to `tsconfig.json` in the
+working directory.
 
 ### JavaScript configuration
 
@@ -576,6 +622,9 @@ describe('users', () => {
 JSX uses the classic runtime, so a `React.createElement` implementation must be
 available in the module scope (or provided through a JSX factory of your choice).
 
+Imports matching `compilerOptions.paths` in `tsconfig.json` are resolved
+automatically, including explicit `.js` specifiers that map to `.ts` files.
+
 See [TypeScript and JSX](./docs/typescript.md) for configuration details.
 
 ## Command line
@@ -592,17 +641,24 @@ guchho-test run --pool=forks              # use child processes instead of threa
 guchho-test run --shard=1/3               # run one shard of the test files
 guchho-test run --reporter=json           # machine-readable output
 guchho-test run --reporter=junit          # JUnit XML output
+guchho-test run --reporter=tap            # TAP output
+guchho-test run --reporter=github         # GitHub Actions annotations
 guchho-test run --coverage                # collect V8 coverage
 guchho-test run --update                  # create or update snapshots
+guchho-test run --changed                 # tests affected by uncommitted changes
+guchho-test run --related src/math.ts     # tests importing a file
+guchho-test run --listTests               # print selected files only
+guchho-test run --passWithNoTests         # allow an empty selection
+guchho-test run --silent                  # suppress test console output
 ```
 
 ### Exit codes
 
-| Code | Meaning |
-|---|---|
-| `0` | All selected tests passed. |
-| `1` | At least one test failed, or a coverage threshold was not met. |
-| `2` | CLI, configuration, discovery, or execution error. |
+| Code | Meaning                                                        |
+| ---- | -------------------------------------------------------------- |
+| `0`  | All selected tests passed.                                     |
+| `1`  | At least one test failed, or a coverage threshold was not met. |
+| `2`  | CLI, configuration, discovery, or execution error.             |
 
 ### Filtering tests
 
@@ -642,7 +698,9 @@ guchho-test watch
 Watch mode monitors the project recursively, tracks local dependencies using the
 TypeScript parser, and reruns only test files affected by a change. Rapid changes
 are debounced and coalesced, added test files are discovered automatically, and
-unrelated files do not trigger runs. Press Ctrl+C to stop watching.
+unrelated files do not trigger runs. In a TTY, press `r` to rerun all tests,
+`/` to enter a test-name filter, `c` to clear it, or `q` to quit. Press Ctrl+C
+to stop watching.
 
 ## Parallel execution
 
@@ -665,8 +723,9 @@ code `2`.
 
 ## Reporters
 
-The built-in reporters are `default`, `verbose`, `dot`, `json`, and `junit`.
-Select one with `--reporter` or the `reporters` configuration option:
+The built-in reporters are `default`, `verbose`, `dot`, `json`, `junit`, `tap`,
+`github`, and `github-actions`. Select one with `--reporter` or the `reporters`
+configuration option:
 
 ```bash
 guchho-test run --reporter=verbose
@@ -683,7 +742,9 @@ export default defineConfig({
 The JSON reporter writes a single JSON document to stdout containing the run
 summary and every file and test result, including stack traces for failures. The
 JUnit reporter writes XML with one `<testsuite>` per test file, including
-failures, skipped/todo tests, and hook errors.
+failures, skipped/todo tests, and hook errors. The TAP reporter emits TAP 13
+with directives and failure diagnostics. The GitHub reporter emits workflow
+annotations for failed tests and hook errors.
 
 See [Reporters](./docs/reporters.md) for the full reporter reference.
 
@@ -695,8 +756,8 @@ guchho-test run --coverage
 
 Coverage uses the V8 inspector and maps results back through TypeScript source
 maps. Reports include lines, functions, branches, and statements. The text report
-is written to stdout, while configured HTML and JSON reports are written below
-`coverage/`.
+is written to stdout, while configured HTML, JSON, LCOV, and Cobertura reports
+are written below `coverage/`.
 
 ```ts
 import { defineConfig } from '@guchho/test';
@@ -704,7 +765,7 @@ import { defineConfig } from '@guchho/test';
 export default defineConfig({
   coverage: {
     enabled: true,
-    reporter: ['text', 'html', 'json'],
+    reporter: ['text', 'html', 'json', 'lcov', 'cobertura'],
     include: ['src/**/*.ts'],
     exclude: ['src/**/*.test.ts'],
     reportsDirectory: 'coverage',
@@ -718,8 +779,9 @@ export default defineConfig({
 });
 ```
 
-Coverage threshold failures produce exit code `1`. Coverage configuration or
-collection errors produce exit code `2`.
+Coverage threshold failures produce exit code `1`. Set `thresholds.perFile: true`
+to apply metric thresholds to every file instead of only the overall totals.
+Coverage configuration or collection errors produce exit code `2`.
 
 See [Coverage](./docs/coverage.md) for the full coverage reference.
 
