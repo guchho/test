@@ -62,11 +62,7 @@ function renderArrayLike(
   return `${label} ${renderArray(values, level, seen)}`;
 }
 
-function render(
-  value: unknown,
-  level: number,
-  seen: WeakSet<object>,
-): string {
+function render(value: unknown, level: number, seen: WeakSet<object>): string {
   switch (typeof value) {
     case 'string':
       return quote(value);
@@ -152,9 +148,7 @@ function render(
     }
 
     if (value instanceof Set) {
-      const entries = [...value].map(
-        (entry) => render(entry, level + 1, seen),
-      );
+      const entries = [...value].map((entry) => render(entry, level + 1, seen));
 
       if (entries.length === 0) {
         return 'Set {}';
@@ -200,18 +194,15 @@ function render(
     }
 
     const prototype = Object.getPrototypeOf(value) as object | null;
-    const isPlain =
-      prototype === Object.prototype || prototype === null;
+    const isPlain = prototype === Object.prototype || prototype === null;
 
     const record = value as Record<string, unknown>;
     const entries = Object.keys(record)
       .sort()
-      .map(
-        (key): readonly [string, unknown] => [
-          /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : quote(key),
-          record[key],
-        ],
-      );
+      .map((key): readonly [string, unknown] => [
+        /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : quote(key),
+        record[key],
+      ]);
 
     if (!isPlain) {
       const name = constructorName(value as object) ?? 'Object';
