@@ -1,14 +1,8 @@
 import { performance } from 'node:perf_hooks';
 
 import { defaultTimeout } from '../config/defaults.js';
-import {
-  resetSoftAssertions,
-  takeSoftAssertions,
-} from '../expect/expect.js';
-import {
-  beginSnapshotTest,
-  endSnapshotTest,
-} from '../snapshot/session.js';
+import { resetSoftAssertions, takeSoftAssertions } from '../expect/expect.js';
+import { beginSnapshotTest, endSnapshotTest } from '../snapshot/session.js';
 import type {
   HookError,
   HookFunction,
@@ -68,7 +62,11 @@ function collectTests(
 
   for (const item of suite.items) {
     if (item.kind === 'test') {
-      collected.push({ test: item, ancestorOnly: only, ancestorSkipped: skipped });
+      collected.push({
+        test: item,
+        ancestorOnly: only,
+        ancestorSkipped: skipped,
+      });
     } else {
       collectTests(item, only, skipped, collected);
     }
@@ -167,12 +165,17 @@ async function executeTest(
 
   const timeout = test.timeout ?? defaultTestTimeout;
   const start = performance.now();
-  const isFails = (test as any).mode === 'fails';
+  const isFails = test.mode === 'fails';
 
   try {
     await runWithTimeout(test.fn, timeout, `Test "${test.fullName}"`);
     if (isFails) {
-      return createResult(test, 'failed', performance.now() - start, new Error('Expected test to fail but it passed.'));
+      return createResult(
+        test,
+        'failed',
+        performance.now() - start,
+        new Error('Expected test to fail but it passed.'),
+      );
     }
     return createResult(test, 'passed', performance.now() - start, undefined);
   } catch (error) {
@@ -183,10 +186,7 @@ async function executeTest(
   }
 }
 
-function resolveStatus(
-  collected: CollectedTest,
-  hasOnly: boolean,
-): TestStatus {
+function resolveStatus(collected: CollectedTest, hasOnly: boolean): TestStatus {
   const { test, ancestorOnly, ancestorSkipped } = collected;
 
   if (ancestorSkipped || test.mode === 'skip') {
@@ -197,8 +197,8 @@ function resolveStatus(
     return 'todo';
   }
 
-  if ((test as any).mode === 'fails' || (test as any).mode === 'concurrent') {
-    if (hasOnly && !ancestorOnly && test.mode !== 'only') {
+  if (test.mode === 'fails' || test.mode === 'concurrent') {
+    if (hasOnly && !ancestorOnly) {
       return 'skipped';
     }
     return 'passed';
@@ -541,7 +541,13 @@ async function executeSequentialSuite(
 
     if (item.kind === 'suite') {
       await flush();
-      await executeSuite(item, beforeEachHooks, afterEachHooks, state, suiteConcurrent);
+      await executeSuite(
+        item,
+        beforeEachHooks,
+        afterEachHooks,
+        state,
+        suiteConcurrent,
+      );
       continue;
     }
 
@@ -613,12 +619,7 @@ async function executeSuite(
   if (beforeAllFailed) {
     reportSkippedTests(suite, state);
   } else if (suiteConcurrent) {
-    await executeConcurrentSuite(
-      suite,
-      beforeEachHooks,
-      afterEachHooks,
-      state,
-    );
+    await executeConcurrentSuite(suite, beforeEachHooks, afterEachHooks, state);
   } else {
     await executeSequentialSuite(
       suite,
