@@ -1,10 +1,5 @@
 import { formatHookError, formatResultError, formatSummary } from './format.js';
-import type {
-  FileReport,
-  Reporter,
-  ReporterIO,
-  RunReport,
-} from './types.js';
+import type { FileReport, Reporter, ReporterIO, RunReport } from './types.js';
 
 const symbols = {
   passed: '.',
@@ -34,7 +29,9 @@ export function createDotReporter(io: ReporterIO): Reporter {
       if (failed.length > 0) {
         io.stdout('\nFailures:\n');
         for (const result of failed) {
-          io.stdout(`✗ ${result.fullName}\n${formatResultError(result.error)}\n`);
+          io.stdout(
+            `✗ ${result.fullName}\n${formatResultError(result.error)}\n`,
+          );
         }
       }
 
