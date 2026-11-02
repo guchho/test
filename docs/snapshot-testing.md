@@ -1,3 +1,8 @@
+---
+title: Snapshot Testing
+description: Capture and compare external and inline snapshots with deterministic serialization.
+---
+
 # Snapshot Testing
 
 Snapshots capture a serialized value and compare it on later runs.
