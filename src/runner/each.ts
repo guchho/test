@@ -46,7 +46,9 @@ function formatPlaceholder(token: string, value: unknown): string {
       return String(value);
     case 'd':
     case 'i':
-      return typeof value === 'number' ? String(Math.trunc(value)) : String(value);
+      return typeof value === 'number'
+        ? String(Math.trunc(value))
+        : String(value);
     case 'f':
       return String(value);
     case 'j':
@@ -82,7 +84,11 @@ function getObjectProperty(
   const keys = path.split('.');
   let current: unknown = obj;
   for (let i = 0; i < keys.length; i += 1) {
-    if (current === null || current === undefined || typeof current !== 'object') {
+    if (
+      current === null ||
+      current === undefined ||
+      typeof current !== 'object'
+    ) {
       return undefined;
     }
     const key = keys[i] as string;
@@ -101,30 +107,32 @@ export function formatEachTitle(
   }
 
   if (isEachCaseObject(argsOrObject)) {
-    let result = template.replace(dollarPlaceholderPattern, (_match, key: string) => {
-      const propKey = key.startsWith('{') && key.endsWith('}')
-        ? key.slice(1, -1)
-        : key;
-      const obj = argsOrObject as Record<string, unknown>;
-      if (Object.prototype.hasOwnProperty.call(obj, propKey)) {
-        const val = obj[propKey];
-        if (val === undefined && propKey.includes('.')) {
-          const value = getObjectProperty(obj, propKey);
-          return formatValueForTitle(value);
-        }
-        if (val === undefined && !propKey.includes('.')) {
+    let result = template.replace(
+      dollarPlaceholderPattern,
+      (_match, key: string) => {
+        const propKey =
+          key.startsWith('{') && key.endsWith('}') ? key.slice(1, -1) : key;
+        const obj = argsOrObject as Record<string, unknown>;
+        if (Object.prototype.hasOwnProperty.call(obj, propKey)) {
+          const val = obj[propKey];
+          if (val === undefined && propKey.includes('.')) {
+            const value = getObjectProperty(obj, propKey);
+            return formatValueForTitle(value);
+          }
+          if (val === undefined && !propKey.includes('.')) {
+            return formatValueForTitle(val);
+          }
           return formatValueForTitle(val);
         }
-        return formatValueForTitle(val);
-      }
-      const value = getObjectProperty(obj, propKey);
-      if (value === undefined && !propKey.includes('.')) {
-        throw new TypeError(
-          `The each title "${template}" uses a property that is not provided.`,
-        );
-      }
-      return formatValueForTitle(value);
-    });
+        const value = getObjectProperty(obj, propKey);
+        if (value === undefined && !propKey.includes('.')) {
+          throw new TypeError(
+            `The each title "${template}" uses a property that is not provided.`,
+          );
+        }
+        return formatValueForTitle(value);
+      },
+    );
     result = result.replace(/%#/g, String(index));
     return result;
   }
