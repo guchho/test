@@ -1,12 +1,7 @@
 import type { SerializedError } from '../runner/serialize.js';
 import { serializeError } from '../runner/serialize.js';
 import type { HookType, TestStatus } from '../runner/types.js';
-import type {
-  FileReport,
-  Reporter,
-  ReporterIO,
-  RunReport,
-} from './types.js';
+import type { FileReport, Reporter, ReporterIO, RunReport } from './types.js';
 
 interface JsonTestResult {
   readonly name: string;
@@ -62,8 +57,7 @@ export function createJsonReporter(io: ReporterIO): Reporter {
         fullName: result.fullName,
         status: result.status,
         duration: result.duration,
-        error:
-          result.error === undefined ? null : serializeError(result.error),
+        error: result.error === undefined ? null : serializeError(result.error),
       });
     },
     onHookError(error): void {
