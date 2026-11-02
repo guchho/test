@@ -20,13 +20,17 @@ export interface RunCommand {
   readonly bail: boolean;
   readonly updateSnapshots: boolean;
   readonly coverage: boolean;
+  readonly silent: boolean;
+  readonly listTests: boolean;
+  readonly passWithNoTests: boolean;
+  readonly changed: boolean;
+  readonly changedSince: string | undefined;
+  readonly related: readonly string[];
   readonly watch: boolean;
 }
 
 export type ParsedCommand =
-  | RunCommand
-  | { readonly kind: 'help' }
-  | { readonly kind: 'version' };
+  RunCommand | { readonly kind: 'help' } | { readonly kind: 'version' };
 
 export class CliError extends Error {
   override readonly name = 'CliError';
@@ -38,6 +42,9 @@ const reporterNames = new Set<ReporterName>([
   'dot',
   'json',
   'junit',
+  'tap',
+  'github',
+  'github-actions',
 ]);
 
 const poolNames = new Set<ExecutionPool>(['threads', 'forks']);
@@ -70,9 +77,7 @@ function readMaxWorkersValue(argv: readonly string[], index: number): number {
   const maxWorkers = Number(value);
 
   if (!Number.isInteger(maxWorkers) || maxWorkers <= 0) {
-    throw new CliError(
-      'The --maxWorkers option requires a positive integer.',
-    );
+    throw new CliError('The --maxWorkers option requires a positive integer.');
   }
 
   return maxWorkers;
@@ -91,10 +96,7 @@ function readReporterValue(
   return value as ReporterName;
 }
 
-function readShardValue(
-  argv: readonly string[],
-  index: number,
-): ShardOptions {
+function readShardValue(argv: readonly string[], index: number): ShardOptions {
   const value = readValue(argv, index, '--shard');
   const match = /^(\d+)\/(\d+)$/.exec(value);
 
@@ -114,9 +116,7 @@ function readShardValue(
     shardCount < 1 ||
     shardIndex > shardCount
   ) {
-    throw new CliError(
-      'The --shard option requires 1 <= index <= count.',
-    );
+    throw new CliError('The --shard option requires 1 <= index <= count.');
   }
 
   return { index: shardIndex, count: shardCount };
@@ -147,6 +147,12 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
   let bail = false;
   let updateSnapshots = false;
   let coverage = false;
+  let silent = false;
+  let listTests = false;
+  let passWithNoTests = false;
+  let changed = false;
+  let changedSince: string | undefined;
+  const related: string[] = [];
   let watch = false;
   let command: 'run' | 'watch' | undefined;
 
@@ -201,6 +207,49 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
 
     if (argument === '--coverage') {
       coverage = true;
+      continue;
+    }
+
+    if (argument === '--silent') {
+      silent = true;
+      continue;
+    }
+
+    if (argument === '--listTests') {
+      listTests = true;
+      continue;
+    }
+
+    if (argument === '--passWithNoTests') {
+      passWithNoTests = true;
+      continue;
+    }
+
+    if (argument === '--changed') {
+      changed = true;
+      continue;
+    }
+
+    if (argument.startsWith('--changed=')) {
+      changed = true;
+      changedSince = readValue(
+        [argument.slice('--changed='.length)],
+        0,
+        '--changed',
+      );
+      continue;
+    }
+
+    if (argument === '--related') {
+      index += 1;
+      related.push(readValue(argv, index, '--related'));
+      continue;
+    }
+
+    if (argument.startsWith('--related=')) {
+      related.push(
+        readValue([argument.slice('--related='.length)], 0, '--related'),
+      );
       continue;
     }
 
@@ -315,6 +364,18 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
     throw new CliError('The --shard option cannot be used with watch mode.');
   }
 
+  if (watch && listTests) {
+    throw new CliError(
+      'The --listTests option cannot be used with watch mode.',
+    );
+  }
+
+  if (watch && (changed || related.length > 0)) {
+    throw new CliError(
+      'The --changed and --related options cannot be used with watch mode.',
+    );
+  }
+
   return {
     kind: 'run',
     files,
@@ -329,6 +390,12 @@ export function parseArgs(argv: readonly string[]): ParsedCommand {
     bail,
     updateSnapshots,
     coverage,
+    silent,
+    listTests,
+    passWithNoTests,
+    changed,
+    changedSince,
+    related,
     watch,
   };
 }
