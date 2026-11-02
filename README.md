@@ -1,3 +1,5 @@
+[![@guchho/test Banner](https://raw.githubusercontent.com/guchho/website/refs/heads/main/public/test-og.png)](https://github.com/guchho/test)
+
 Guchho Test is a lightweight [testing framework](https://guchho.js.org/test/) for JavaScript and TypeScript, featuring a familiar `describe`/`it`/`expect` API.
 
 <p>
