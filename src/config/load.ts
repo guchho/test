@@ -2,10 +2,15 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { defaultConfig, defaultTimeout } from './defaults.js';
+import {
+  defaultConfig,
+  defaultEnvironment,
+  defaultTimeout,
+} from './defaults.js';
 import type {
   CoverageConfig,
   CoverageReporterName,
+  EnvironmentName,
   GuchhoConfig,
   ReporterEntry,
   ReporterName,
@@ -26,12 +31,23 @@ const reporterNames = new Set<ReporterName>([
   'dot',
   'json',
   'junit',
+  'tap',
+  'github',
+  'github-actions',
 ]);
 
 const coverageReporterNames = new Set<CoverageReporterName>([
   'text',
   'html',
   'json',
+  'lcov',
+  'cobertura',
+]);
+
+const environmentNames = new Set<EnvironmentName>([
+  'node',
+  'jsdom',
+  'happy-dom',
 ]);
 
 const knownConfigKeys = new Set([
@@ -44,6 +60,10 @@ const knownConfigKeys = new Set([
   'setupFilesAfterEnv',
   'globalSetup',
   'globalTeardown',
+  'environment',
+  'environmentOptions',
+  'globals',
+  'tsconfig',
   'coverage',
 ]);
 
@@ -62,6 +82,7 @@ const knownThresholdKeys = new Set([
   'functions',
   'branches',
   'statements',
+  'perFile',
 ]);
 
 export class ConfigError extends Error {
@@ -83,6 +104,10 @@ export interface ResolvedConfig {
   readonly setupFilesAfterEnv: readonly string[];
   readonly globalSetup: string | undefined;
   readonly globalTeardown: string | undefined;
+  readonly environment: EnvironmentName;
+  readonly environmentOptions: Readonly<Record<string, unknown>>;
+  readonly globals: boolean;
+  readonly tsconfig: string | undefined;
   readonly coverage: Readonly<CoverageConfig>;
 }
 
@@ -142,12 +167,28 @@ function validateNonEmptyString(
   return value;
 }
 
-function validateTimeout(value: unknown, source: string): number {
+function validateEnvironment(value: unknown, source: string): EnvironmentName {
   if (
-    typeof value !== 'number' ||
-    !Number.isFinite(value) ||
-    value <= 0
+    typeof value !== 'string' ||
+    !environmentNames.has(value as EnvironmentName)
   ) {
+    throw new ConfigError(
+      `${source}: "environment" must be one of "node", "jsdom", or "happy-dom".`,
+    );
+  }
+
+  return value as EnvironmentName;
+}
+
+function validateEnvironmentOptions(
+  value: unknown,
+  source: string,
+): Record<string, unknown> {
+  return assertObject(value, source, '"environmentOptions"');
+}
+
+function validateTimeout(value: unknown, source: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
     throw new ConfigError(
       `${source}: "timeout" must be a positive, finite number.`,
     );
@@ -168,9 +209,7 @@ function validateReporters(
   return value.map((entry) => {
     if (typeof entry === 'string') {
       if (!allowCustom && !reporterNames.has(entry as ReporterName)) {
-        throw new ConfigError(
-          `${source}: unknown reporter "${entry}".`,
-        );
+        throw new ConfigError(`${source}: unknown reporter "${entry}".`);
       }
 
       return entry as ReporterName;
@@ -188,9 +227,7 @@ function validateReporters(
       (!allowCustom && !reporterNames.has(name as ReporterName)) ||
       name.trim().length === 0
     ) {
-      throw new ConfigError(
-        `${source}: unknown reporter "${String(name)}".`,
-      );
+      throw new ConfigError(`${source}: unknown reporter "${String(name)}".`);
     }
 
     assertObject(options, source, `reporter "${name}" options`);
@@ -199,17 +236,12 @@ function validateReporters(
   });
 }
 
-function validateCoverage(
-  value: unknown,
-  source: string,
-): CoverageConfig {
+function validateCoverage(value: unknown, source: string): CoverageConfig {
   const coverage = assertObject(value, source, '"coverage"');
 
   for (const key of Object.keys(coverage)) {
     if (!knownCoverageKeys.has(key)) {
-      throw new ConfigError(
-        `${source}: unknown coverage option "${key}".`,
-      );
+      throw new ConfigError(`${source}: unknown coverage option "${key}".`);
     }
   }
 
@@ -217,9 +249,7 @@ function validateCoverage(
 
   if (coverage.enabled !== undefined) {
     if (typeof coverage.enabled !== 'boolean') {
-      throw new ConfigError(
-        `${source}: "coverage.enabled" must be a boolean.`,
-      );
+      throw new ConfigError(`${source}: "coverage.enabled" must be a boolean.`);
     }
 
     result.enabled = coverage.enabled;
@@ -227,9 +257,7 @@ function validateCoverage(
 
   if (coverage.provider !== undefined) {
     if (coverage.provider !== 'v8') {
-      throw new ConfigError(
-        `${source}: "coverage.provider" must be "v8".`,
-      );
+      throw new ConfigError(`${source}: "coverage.provider" must be "v8".`);
     }
 
     result.provider = 'v8';
@@ -237,9 +265,7 @@ function validateCoverage(
 
   if (coverage.reporter !== undefined) {
     if (!Array.isArray(coverage.reporter)) {
-      throw new ConfigError(
-        `${source}: "coverage.reporter" must be an array.`,
-      );
+      throw new ConfigError(`${source}: "coverage.reporter" must be an array.`);
     }
 
     result.reporter = coverage.reporter.map((entry) => {
@@ -302,7 +328,19 @@ function validateCoverage(
 
     const validated: Record<string, number> = {};
 
+    if (thresholds.perFile !== undefined) {
+      if (typeof thresholds.perFile !== 'boolean') {
+        throw new ConfigError(
+          `${source}: coverage threshold "perFile" must be a boolean.`,
+        );
+      }
+    }
+
     for (const [key, threshold] of Object.entries(thresholds)) {
+      if (key === 'perFile') {
+        continue;
+      }
+
       if (
         typeof threshold !== 'number' ||
         !Number.isFinite(threshold) ||
@@ -322,7 +360,12 @@ function validateCoverage(
       validated[key] = threshold;
     }
 
-    result.thresholds = validated;
+    result.thresholds = {
+      ...validated,
+      ...(thresholds.perFile === undefined
+        ? {}
+        : { perFile: thresholds.perFile }),
+    };
   }
 
   return result;
@@ -333,7 +376,9 @@ export function validateConfig(value: unknown, source: string): GuchhoConfig {
 
   for (const key of Object.keys(config)) {
     if (!knownConfigKeys.has(key)) {
-      throw new ConfigError(`${source}: unknown configuration option "${key}".`);
+      throw new ConfigError(
+        `${source}: unknown configuration option "${key}".`,
+      );
     }
   }
 
@@ -384,6 +429,33 @@ export function validateConfig(value: unknown, source: string): GuchhoConfig {
       config.globalTeardown,
       source,
       'globalTeardown',
+    );
+  }
+
+  if (config.environment !== undefined) {
+    result.environment = validateEnvironment(config.environment, source);
+  }
+
+  if (config.environmentOptions !== undefined) {
+    result.environmentOptions = validateEnvironmentOptions(
+      config.environmentOptions,
+      source,
+    );
+  }
+
+  if (config.globals !== undefined) {
+    if (typeof config.globals !== 'boolean') {
+      throw new ConfigError(`${source}: "globals" must be a boolean.`);
+    }
+
+    result.globals = config.globals;
+  }
+
+  if (config.tsconfig !== undefined) {
+    result.tsconfig = validateNonEmptyString(
+      config.tsconfig,
+      source,
+      'tsconfig',
     );
   }
 
@@ -519,6 +591,15 @@ export function resolveConfig(
     setupFilesAfterEnv: config?.setupFilesAfterEnv ?? [],
     globalSetup: config?.globalSetup,
     globalTeardown: config?.globalTeardown,
+    environment:
+      config?.environment ?? defaultConfig.environment ?? defaultEnvironment,
+    environmentOptions:
+      config?.environmentOptions ??
+      (defaultConfig.environmentOptions as
+        Readonly<Record<string, unknown>> | undefined) ??
+      {},
+    globals: config?.globals ?? defaultConfig.globals ?? false,
+    tsconfig: config?.tsconfig,
     coverage: resolvedCoverage,
   };
 }
