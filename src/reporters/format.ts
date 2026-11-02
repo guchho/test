@@ -24,7 +24,10 @@ export function formatHookError(hookError: HookError): string {
   const error = formatError(hookError.error);
   return (
     `✗ ${hookError.type} hook in "${hookError.suite}" failed\n` +
-    `${error.split('\n').map((line) => `  ${line}`).join('\n')}\n`
+    `${error
+      .split('\n')
+      .map((line) => `  ${line}`)
+      .join('\n')}\n`
   );
 }
 
