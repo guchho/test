@@ -1,6 +1,7 @@
 import { inspect } from 'node:util';
 
 import type { CoveragePayload } from '../coverage/types.js';
+import type { EnvironmentName } from '../config/types.js';
 
 import type {
   HookError,
@@ -46,19 +47,41 @@ export interface WorkerInput {
   readonly file: string;
   readonly timeout: number;
   readonly filter: string | undefined;
-  readonly testNamePattern: { readonly source: string; readonly flags: string } | undefined;
+  readonly testNamePattern:
+    { readonly source: string; readonly flags: string } | undefined;
   readonly bail: boolean;
   readonly updateSnapshots: boolean;
   readonly coverage: boolean;
+  readonly silent: boolean;
   readonly setupFiles: readonly string[];
   readonly setupFilesAfterEnv: readonly string[];
+  readonly environment: EnvironmentName;
+  readonly environmentOptions: Readonly<Record<string, unknown>>;
+  readonly globals: boolean;
+  readonly tsconfig: string | undefined;
 }
 
 export type WorkerOutcome = (
-  | { readonly kind: 'result'; readonly file: string; readonly result: SerializedRunResult }
-  | { readonly kind: 'load-error'; readonly file: string; readonly error: SerializedError }
-  | { readonly kind: 'failure'; readonly file: string; readonly message: string }
-) & { readonly coverage?: CoveragePayload };
+  | {
+      readonly kind: 'result';
+      readonly file: string;
+      readonly result: SerializedRunResult;
+    }
+  | {
+      readonly kind: 'load-error';
+      readonly file: string;
+      readonly error: SerializedError;
+    }
+  | {
+      readonly kind: 'failure';
+      readonly file: string;
+      readonly message: string;
+    }
+) & {
+  readonly coverage?: CoveragePayload;
+  readonly obsoleteSnapshots?: readonly string[];
+  readonly prunedSnapshots?: readonly string[];
+};
 
 export function serializeError(error: unknown): SerializedError {
   if (error instanceof Error) {
@@ -133,24 +156,20 @@ export function serializeRunResult(
 
 export function deserializeRunResult(result: SerializedRunResult): RunResult {
   return {
-    results: result.results.map(
-      (entry): TestResult => ({
-        name: entry.name,
-        fullName: entry.fullName,
-        status: entry.status,
-        duration: entry.duration,
-        error:
-          entry.error === undefined ? undefined : deserializeError(entry.error),
-      }),
-    ),
+    results: result.results.map((entry): TestResult => ({
+      name: entry.name,
+      fullName: entry.fullName,
+      status: entry.status,
+      duration: entry.duration,
+      error:
+        entry.error === undefined ? undefined : deserializeError(entry.error),
+    })),
     summary: result.summary,
-    errors: result.errors.map(
-      (entry): HookError => ({
-        type: entry.type,
-        suite: entry.suite,
-        error: deserializeError(entry.error),
-      }),
-    ),
+    errors: result.errors.map((entry): HookError => ({
+      type: entry.type,
+      suite: entry.suite,
+      error: deserializeError(entry.error),
+    })),
     duration: result.duration,
     success: result.success,
   };
