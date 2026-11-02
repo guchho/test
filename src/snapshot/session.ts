@@ -12,6 +12,7 @@ interface SnapshotState {
   currentTest: string | undefined;
   counters: Map<string, number>;
   usedKeys: Set<string>;
+  allUsedKeys: Set<string>;
   values: Map<string, string> | undefined;
 }
 
@@ -21,6 +22,7 @@ const state: SnapshotState = {
   currentTest: undefined,
   counters: new Map<string, number>(),
   usedKeys: new Set<string>(),
+  allUsedKeys: new Set<string>(),
   values: undefined,
 };
 
@@ -30,6 +32,7 @@ export function configureSnapshots(options: SnapshotSessionOptions): void {
   state.currentTest = undefined;
   state.counters.clear();
   state.usedKeys.clear();
+  state.allUsedKeys.clear();
   state.values = undefined;
 }
 
@@ -86,6 +89,7 @@ export function nextSnapshotKey(hint: string | undefined): string {
   }
 
   state.usedKeys.add(key);
+  state.allUsedKeys.add(key);
   return key;
 }
 
@@ -117,6 +121,7 @@ function loadValues(): Map<string, string> {
       `Failed to parse snapshot file ${file}: ${
         error instanceof Error ? error.message : String(error)
       }`,
+      { cause: error },
     );
   }
 
@@ -127,9 +132,7 @@ function loadValues(): Map<string, string> {
   const values = new Map<string, string>();
   for (const [key, value] of Object.entries(parsed)) {
     if (typeof value !== 'string') {
-      throw new Error(
-        `Snapshot "${key}" in ${file} must be a string.`,
-      );
+      throw new Error(`Snapshot "${key}" in ${file} must be a string.`);
     }
 
     values.set(key, value);
@@ -143,10 +146,7 @@ export function readSnapshot(key: string): string | undefined {
   return loadValues().get(key);
 }
 
-export function writeSnapshot(key: string, value: string): void {
-  const values = loadValues();
-  values.set(key, value);
-
+function persistValues(values: Map<string, string>): void {
   const file = snapshotFilePath();
   mkdirSync(path.dirname(file), { recursive: true });
 
@@ -159,4 +159,43 @@ export function writeSnapshot(key: string, value: string): void {
   }
 
   writeFileSync(file, `${JSON.stringify(sorted, null, 2)}\n`, 'utf8');
+}
+
+export function writeSnapshot(key: string, value: string): void {
+  const values = loadValues();
+  values.set(key, value);
+  persistValues(values);
+}
+
+export interface FinalizeSnapshotOptions {
+  readonly prune: boolean;
+}
+
+export interface SnapshotFinalizeResult {
+  readonly obsolete: readonly string[];
+  readonly pruned: readonly string[];
+}
+
+export function finalizeSnapshots(
+  options: FinalizeSnapshotOptions,
+): SnapshotFinalizeResult {
+  if (state.testFile === undefined) {
+    return { obsolete: [], pruned: [] };
+  }
+
+  const values = loadValues();
+  const obsolete = [...values.keys()]
+    .filter((key) => !state.allUsedKeys.has(key))
+    .sort();
+
+  if (!options.prune || obsolete.length === 0) {
+    return { obsolete, pruned: [] };
+  }
+
+  for (const key of obsolete) {
+    values.delete(key);
+  }
+
+  persistValues(values);
+  return { obsolete, pruned: obsolete };
 }
