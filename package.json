@@ -1,6 +1,6 @@
 {
   "name": "@guchho/test",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Lightweight JavaScript and TypeScript testing framework for the Guchho ecosystem.",
   "type": "module",
   "license": "MIT",
