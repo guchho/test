@@ -26,8 +26,7 @@ abstract class BaseAsymmetricMatcher implements AsymmetricMatcher {
 
 function isObjectLike(value: unknown): value is object {
   return (
-    (typeof value === 'object' && value !== null) ||
-    typeof value === 'function'
+    (typeof value === 'object' && value !== null) || typeof value === 'function'
   );
 }
 
@@ -57,7 +56,9 @@ class AnyMatcher extends BaseAsymmetricMatcher {
       case Object:
         return isObjectLike(actual);
       default:
-        return actual instanceof (this.sample as new (...args: unknown[]) => object);
+        return (
+          actual instanceof (this.sample as new (...args: unknown[]) => object)
+        );
     }
   }
 
@@ -169,7 +170,9 @@ class StringMatchingMatcher extends BaseAsymmetricMatcher {
   constructor(sample: string | RegExp) {
     super();
     this.pattern =
-      sample instanceof RegExp ? new RegExp(sample.source, sample.flags) : new RegExp(sample);
+      sample instanceof RegExp
+        ? new RegExp(sample.source, sample.flags)
+        : new RegExp(sample);
   }
 
   override asymmetricMatch(actual: unknown): boolean {
@@ -247,9 +250,7 @@ export function objectContaining(
   return new ObjectContainingMatcher(sample);
 }
 
-export function arrayContaining(
-  sample: readonly unknown[],
-): AsymmetricMatcher {
+export function arrayContaining(sample: readonly unknown[]): AsymmetricMatcher {
   if (!Array.isArray(sample)) {
     throw new TypeError('expect.arrayContaining expects an array.');
   }
