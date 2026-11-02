@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import type { ResolvedConfig } from '../config/load.js';
 import type { CoverageConfig } from '../config/types.js';
+import { version } from '../version.js';
 import { coveragePercentage } from './collect.js';
 import type {
   CoverageMetric,
@@ -225,7 +226,7 @@ ${lineHits}
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
-<coverage line-rate="${coverageRate(report.totals.lines)}" branch-rate="${coverageRate(report.totals.branches)}" lines-covered="${report.totals.lines.covered}" lines-valid="${report.totals.lines.total}" branches-covered="${report.totals.branches.covered}" branches-valid="${report.totals.branches.total}" complexity="0" version="0.0.1" timestamp="${Date.now()}">
+<coverage line-rate="${coverageRate(report.totals.lines)}" branch-rate="${coverageRate(report.totals.branches)}" lines-covered="${report.totals.lines.covered}" lines-valid="${report.totals.lines.total}" branches-covered="${report.totals.branches.covered}" branches-valid="${report.totals.branches.total}" complexity="0" version="${version}" timestamp="${Date.now()}">
   <sources>
     <source>${escapeHtml(cwd)}</source>
   </sources>
