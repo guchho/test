@@ -1,5 +1,5 @@
 ---
-title: Guchho Test Documentation
+title: Guchho Test
 description: Fast, ESM-first JavaScript and TypeScript testing framework for the Guchho ecosystem.
 date: "2026-11-02"
 ---
@@ -22,50 +22,6 @@ deterministic output, and ships with actionable diagnostics.
 - [Installation](./installation.md) — Install the package and add scripts
 - [Quick Start](./quick-start.md) — Write and run your first test in minutes
 - [Writing Tests](./writing-tests.md) — Structure suites, use modifiers, and write async tests
-
-## Contents
-
-### Core Concepts
-
-| Page | What it covers |
-| --- | --- |
-| [Introduction](./introduction.md) | Philosophy, features, and design principles |
-| [Installation](./installation.md) | Requirements, setup, and verification |
-| [Quick Start](./quick-start.md) | Minimal example from scratch |
-| [Writing Tests](./writing-tests.md) | Test registration, table-driven tests, timeouts, and isolation |
-| [Lifecycle Hooks](./lifecycle-hooks.md) | `beforeAll`, `beforeEach`, `afterEach`, `afterAll` and ordering |
-| [TypeScript and JSX](./typescript.md) | TS/TSX/JSX support, transformation, and source maps |
-
-### Assertions & Mocking
-
-| Page | What it covers |
-| --- | --- |
-| [Assertions](./assertions.md) | `expect` API, matchers, async assertions, polling, and custom matchers |
-| [Mocking](./mocking.md) | Mock functions, spies, constructors, fake timers, and ESM module mocking |
-| [Snapshot Testing](./snapshot-testing.md) | External and inline snapshots, updates, and serialization |
-
-### Configuration & Execution
-
-| Page | What it covers |
-| --- | --- |
-| [Configuration](./configuration.md) | Config discovery, options, defaults, validation, and precedence |
-| [CLI Reference](./cli.md) | Commands, flags, filters, sharding, and exit codes |
-| [Watch Mode](./watch-mode.md) | File watching, dependency tracking, and interactive filtering |
-
-### Reporting & Quality
-
-| Page | What it covers |
-| --- | --- |
-| [Coverage](./coverage.md) | V8 coverage, source maps, reporters, thresholds, and CI integration |
-| [Reporters](./reporters.md) | Built-in reporters, plugin reporters, and the reporter API |
-
-### Advanced
-
-| Page | What it covers |
-| --- | --- |
-| [API Reference](./api.md) | All exports, types, `runTests()`, and plugin APIs |
-| [Troubleshooting](./troubleshooting.md) | Common issues, debugging tips, and solutions |
-| [Contributing](./contributing.md) | Development setup, coding style, and release process |
 
 ## At a glance
 
