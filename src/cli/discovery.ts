@@ -14,8 +14,10 @@ function toPosixPath(value: string): string {
 }
 
 function isExcluded(relativePath: string, exclude: readonly string[]): boolean {
-  return matchesAnyGlob(exclude, relativePath) ||
-    matchesAnyGlob(exclude, `${relativePath}/`);
+  return (
+    matchesAnyGlob(exclude, relativePath) ||
+    matchesAnyGlob(exclude, `${relativePath}/`)
+  );
 }
 
 async function walk(
