@@ -1,4 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads';
+import path from 'node:path';
 
 import { CoverageCollector } from '../coverage/collect-worker.js';
 import { pathToFileURL } from 'node:url';
@@ -151,6 +152,19 @@ async function loadSetupFiles(
   }
 }
 
+const commonJsExtensions = new Set(['.cts', '.cjs']);
+
+async function preloadCommonJsDependencies(file: string): Promise<void> {
+  if (!commonJsExtensions.has(path.extname(file))) {
+    return;
+  }
+
+  // Node.js cannot link a nested ESM graph when it is first reached through a
+  // synchronous require() from CommonJS. Preload the package entry so that
+  // CommonJS test files can require('@guchho/test') on every supported version.
+  await import(new URL('../index.js', import.meta.url).href);
+}
+
 async function runTests(input: WorkerInput): Promise<WorkerOutcome> {
   try {
     await loadSetupFiles(input.setupFiles, 'setup file');
@@ -164,6 +178,7 @@ async function runTests(input: WorkerInput): Promise<WorkerOutcome> {
   }
 
   try {
+    await preloadCommonJsDependencies(input.file);
     await import(pathToFileURL(input.file).href);
   } catch (error) {
     return {
