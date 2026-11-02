@@ -3,11 +3,7 @@ import { snapshotMatchers } from '../snapshot/matchers.js';
 import type { MockFunction } from '../mock/mock.js';
 import { isAsymmetricMatcher } from './asymmetric.js';
 import { deepEqual } from './equality.js';
-import type {
-  Matcher,
-  MatcherContext,
-  MatcherResult,
-} from './types.js';
+import type { Matcher, MatcherContext, MatcherResult } from './types.js';
 
 interface MessageOptions {
   readonly hasExpected?: boolean;
@@ -334,7 +330,8 @@ function matchesThrownValue(thrown: unknown, expected: unknown): boolean {
 function expectedThrowDescription(
   context: MatcherContext,
   expected: unknown,
-): string {  if (typeof expected === 'string') {
+): string {
+  if (typeof expected === 'string') {
     return ` with a message containing ${context.utils.printExpected(expected)}`;
   }
 
@@ -587,7 +584,9 @@ export const builtInMatchers: Record<string, Matcher> = {
 
   toMatch(actual, expected) {
     if (typeof actual !== 'string') {
-      throw new TypeError('toMatch requires the received value to be a string.');
+      throw new TypeError(
+        'toMatch requires the received value to be a string.',
+      );
     }
 
     let pass: boolean;
@@ -680,15 +679,9 @@ export const builtInMatchers: Record<string, Matcher> = {
     return {
       pass: actual >= expected,
       message: (): string =>
-        assertionMessage(
-          this,
-          'toBeGreaterThanOrEqual',
-          actual,
-          expected,
-          {
-            expectedLabel: comparisonLabel(this, '>=', expected),
-          },
-        ),
+        assertionMessage(this, 'toBeGreaterThanOrEqual', actual, expected, {
+          expectedLabel: comparisonLabel(this, '>=', expected),
+        }),
     };
   },
 
@@ -725,9 +718,7 @@ export const builtInMatchers: Record<string, Matcher> = {
 
     const path = toPropertyPath(expected[0]);
     const result = readPropertyPath(actual, path);
-    const receivedPath = path
-      .map((segment) => String(segment))
-      .join('.');
+    const receivedPath = path.map((segment) => String(segment)).join('.');
     const pass =
       result.found &&
       (expected.length < 2 || deepEqual(result.value, expected[1]));
@@ -758,9 +749,7 @@ export const builtInMatchers: Record<string, Matcher> = {
             ? `Expected the property path ${receivedPath} not to exist.`
             : `Expected the property path ${receivedPath} to exist.`,
         );
-        lines.push(
-          `Received value: ${this.utils.printReceived(result.value)}`,
-        );
+        lines.push(`Received value: ${this.utils.printReceived(result.value)}`);
         return lines.join('\n');
       },
     };
@@ -771,11 +760,7 @@ export const builtInMatchers: Record<string, Matcher> = {
       throw new TypeError('toBeCloseTo expects a number.');
     }
 
-    if (
-      typeof digits !== 'number' ||
-      !Number.isInteger(digits) ||
-      digits < 0
-    ) {
+    if (typeof digits !== 'number' || !Number.isInteger(digits) || digits < 0) {
       throw new TypeError(
         'toBeCloseTo expects a non-negative integer precision.',
       );
@@ -837,9 +822,7 @@ export const builtInMatchers: Record<string, Matcher> = {
 
   toHaveBeenCalledWith(actual, ...expected) {
     const mock = requireMock(actual, 'toHaveBeenCalledWith');
-    const pass = mock.mock.calls.some((call) =>
-      deepEqual(call, expected),
-    );
+    const pass = mock.mock.calls.some((call) => deepEqual(call, expected));
 
     return {
       pass,
@@ -856,8 +839,7 @@ export const builtInMatchers: Record<string, Matcher> = {
   toHaveBeenLastCalledWith(actual, ...expected) {
     const mock = requireMock(actual, 'toHaveBeenLastCalledWith');
     const lastCall = mock.mock.lastCall;
-    const pass =
-      lastCall !== undefined && deepEqual(lastCall, expected);
+    const pass = lastCall !== undefined && deepEqual(lastCall, expected);
 
     return {
       pass,
