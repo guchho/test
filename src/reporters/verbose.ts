@@ -4,12 +4,7 @@ import {
   formatResultError,
   formatSummary,
 } from './format.js';
-import type {
-  FileReport,
-  Reporter,
-  ReporterIO,
-  RunReport,
-} from './types.js';
+import type { FileReport, Reporter, ReporterIO, RunReport } from './types.js';
 
 const statusLabels = {
   passed: 'PASS',
