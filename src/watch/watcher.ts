@@ -1,6 +1,7 @@
 import { watch } from 'node:fs';
 import type { FSWatcher } from 'node:fs';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 
 import { discoverTestFiles } from '../cli/discovery.js';
 import {
@@ -23,10 +24,12 @@ export interface WatchOptions {
   readonly exclude: readonly string[];
   readonly signal?: AbortSignal | undefined;
   readonly debounceMs?: number | undefined;
+  readonly input?: Readable | undefined;
   readonly log: (text: string) => void;
   readonly error: (text: string) => void;
   readonly run: (
     files: readonly string[],
+    filter?: string,
   ) => Promise<{ readonly success: boolean }>;
 }
 
@@ -48,6 +51,11 @@ export async function watchTests(options: WatchOptions): Promise<void> {
   let timer: NodeJS.Timeout | undefined;
   let busy = false;
   let closed = false;
+  let nameFilter: string | undefined;
+  let filterDraft: string | undefined;
+  let detachInput = (): void => {};
+  let resolveStop: (() => void) | undefined;
+  let stop = (): void => {};
   const pending = new Set<string>();
 
   const discover = async (): Promise<string[]> => {
@@ -55,24 +63,112 @@ export async function watchTests(options: WatchOptions): Promise<void> {
     return files.map((file) => path.resolve(cwd, file));
   };
 
+  const schedule = (delay: number): void => {
+    if (closed) {
+      return;
+    }
+
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+
+    timer = setTimeout(() => {
+      timer = undefined;
+      void processPending();
+    }, delay);
+  };
+
   const runFiles = async (files: readonly string[]): Promise<void> => {
     if (files.length === 0) {
       return;
     }
 
-    log(`[watch] running ${files.length} test file${files.length === 1 ? '' : 's'}`);
+    log(
+      `[watch] running ${files.length} test file${files.length === 1 ? '' : 's'}`,
+    );
 
     for (const file of files) {
       log(`[watch]   ${displayPath(cwd, file)}`);
     }
 
-    const result = await options.run(files);
+    const result = await options.run(files, nameFilter);
     log(
       result.success
         ? '[watch] run completed successfully'
         : '[watch] run completed with failures',
     );
     log('[watch] waiting for file changes');
+  };
+
+  const rerunAll = (): void => {
+    if (currentTests.length === 0) {
+      log('[watch] no test files to run');
+      return;
+    }
+
+    for (const file of currentTests) {
+      pending.add(normalizeWatchPath(file));
+    }
+
+    schedule(0);
+  };
+
+  const applyFilter = (value: string): void => {
+    nameFilter = value.length === 0 ? undefined : value;
+    log(
+      nameFilter === undefined
+        ? '[watch] filter cleared'
+        : `[watch] filter set to "${nameFilter}"`,
+    );
+    rerunAll();
+  };
+
+  const processInput = (text: string): void => {
+    for (const character of [...text]) {
+      if (filterDraft !== undefined) {
+        if (character === '\r') {
+          const draft = filterDraft;
+          filterDraft = undefined;
+          applyFilter(draft);
+        } else if (character === '\n') {
+          continue;
+        } else if (character === '\u001b') {
+          filterDraft = undefined;
+          log('[watch] filter cancelled');
+        } else if (character === '\u007f' || character === '\b') {
+          filterDraft = filterDraft.slice(0, -1);
+        } else if (character >= ' ') {
+          filterDraft += character;
+        }
+
+        continue;
+      }
+
+      if (character === 'q' || character === '\u0003') {
+        log('[watch] quitting');
+        stop();
+        return;
+      }
+
+      if (character === 'r') {
+        nameFilter = undefined;
+        log('[watch] rerunning all tests');
+        rerunAll();
+        continue;
+      }
+
+      if (character === '/') {
+        filterDraft = '';
+        log('[watch] filter (Enter to apply, Esc to cancel): ');
+        continue;
+      }
+
+      if (character === 'c' && nameFilter !== undefined) {
+        nameFilter = undefined;
+        log('[watch] filter cleared');
+        rerunAll();
+      }
+    }
   };
 
   const processPending = async (): Promise<void> => {
@@ -110,9 +206,7 @@ export async function watchTests(options: WatchOptions): Promise<void> {
 
       if (affected.length === 0) {
         if (changed.size > 0) {
-          const labels = [...changed].map((file) =>
-            displayPath(cwd, file),
-          );
+          const labels = [...changed].map((file) => displayPath(cwd, file));
           log(`[watch] no tests affected by: ${labels.join(', ')}`);
         }
 
@@ -133,7 +227,7 @@ export async function watchTests(options: WatchOptions): Promise<void> {
       graph = await collectDependencies(currentTests);
     } catch (caught) {
       error(
-        `[watch] ${caught instanceof Error ? caught.stack ?? caught.message : String(caught)}\n`,
+        `[watch] ${caught instanceof Error ? (caught.stack ?? caught.message) : String(caught)}\n`,
       );
     } finally {
       busy = false;
@@ -142,21 +236,6 @@ export async function watchTests(options: WatchOptions): Promise<void> {
         schedule(0);
       }
     }
-  };
-
-  const schedule = (delay: number): void => {
-    if (closed) {
-      return;
-    }
-
-    if (timer !== undefined) {
-      clearTimeout(timer);
-    }
-
-    timer = setTimeout(() => {
-      timer = undefined;
-      void processPending();
-    }, delay);
   };
 
   currentTests = await discover();
@@ -169,8 +248,7 @@ export async function watchTests(options: WatchOptions): Promise<void> {
       await runFiles(currentTests);
     } catch (caught) {
       error(
-        `[watch] ${caught instanceof Error ? caught.stack ?? caught.message : String(caught)}
-`,
+        `[watch] ${caught instanceof Error ? (caught.stack ?? caught.message) : String(caught)}\n`,
       );
     }
   }
@@ -179,7 +257,9 @@ export async function watchTests(options: WatchOptions): Promise<void> {
   log('[watch] waiting for file changes');
 
   await new Promise<void>((resolve) => {
-    const stop = (): void => {
+    resolveStop = resolve;
+
+    stop = (): void => {
       if (closed) {
         return;
       }
@@ -193,7 +273,8 @@ export async function watchTests(options: WatchOptions): Promise<void> {
 
       watcher?.close();
       options.signal?.removeEventListener('abort', stop);
-      resolve();
+      detachInput();
+      resolveStop?.();
     };
 
     if (options.signal?.aborted === true) {
@@ -231,6 +312,41 @@ export async function watchTests(options: WatchOptions): Promise<void> {
       watcher.on('error', (caught) => {
         error(`[watch] watcher error: ${caught.message}\n`);
       });
+
+      const input =
+        options.input ?? (process.stdin.isTTY ? process.stdin : undefined);
+
+      if (input !== undefined) {
+        const tty = input as Readable & {
+          isTTY?: boolean;
+          setRawMode?: (mode: boolean) => void;
+        };
+        let restoreRawMode: (() => void) | undefined;
+
+        if (typeof tty.setRawMode === 'function') {
+          tty.setRawMode(true);
+          restoreRawMode = (): void => {
+            tty.setRawMode?.(false);
+          };
+        }
+
+        const onData = (chunk: Buffer | string): void => {
+          if (!closed) {
+            processInput(chunk.toString());
+          }
+        };
+
+        input.resume();
+        input.on('data', onData);
+        detachInput = (): void => {
+          input.off('data', onData);
+          restoreRawMode?.();
+          restoreRawMode = undefined;
+          input.pause();
+        };
+
+        log('[watch] keys: r rerun, / filter, c clear filter, q quit');
+      }
     } catch (caught) {
       error(
         `[watch] failed to watch ${cwd}: ${
