@@ -1,3 +1,8 @@
+---
+title: Lifecycle Hooks
+description: Run setup and teardown code around suites and tests with before/after hooks.
+---
+
 # Lifecycle Hooks
 
 Hooks run around suites and tests. Import them from `@guchho/test`:
