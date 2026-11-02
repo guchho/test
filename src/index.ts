@@ -16,15 +16,13 @@ export type {
   PollExpectation,
   PollOptions,
 } from './expect/expect.js';
-export type {
-  AsymmetricMatcher,
-  Equals,
-} from './expect/asymmetric.js';
+export type { AsymmetricMatcher, Equals } from './expect/asymmetric.js';
 export { AssertionError } from './expect/errors.js';
 export type {
   CoverageConfig,
   CoverageReporterName,
   CoverageThresholds,
+  EnvironmentName,
   GuchhoConfig,
   ReporterEntry,
   ReporterName,
@@ -72,16 +70,23 @@ export type {
 } from './runner/types.js';
 export { mock } from './mock/mock.js';
 export type {
+  FakeTimerApi,
+  FakeTimerInstallOptions,
+  FakeTimerName,
   MockApi,
   MockFunction,
   MockResult,
   MockState,
 } from './mock/mock.js';
-export { definePlugin, defineReporter } from './plugins/types.js';
+export { runTests } from './api/run.js';
 export type {
-  GuchhoPlugin,
-  ReporterFactory,
-} from './plugins/types.js';
+  FileRunResult,
+  RunTestsOptions,
+  RunTestsResult,
+} from './api/run.js';
+export type { InstalledEnvironment } from './environment/index.js';
+export { definePlugin, defineReporter } from './plugins/types.js';
+export type { GuchhoPlugin, ReporterFactory } from './plugins/types.js';
 export type {
   FileReport,
   Reporter,
