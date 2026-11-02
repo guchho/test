@@ -19,6 +19,8 @@ export type FileOutcome =
       readonly result: RunResult;
       readonly testCount: number;
       readonly coverage: CoveragePayload | undefined;
+      readonly obsoleteSnapshots: readonly string[];
+      readonly prunedSnapshots: readonly string[];
     }
   | {
       readonly kind: 'load-error';
@@ -56,6 +58,8 @@ function toFileOutcome(outcome: WorkerOutcome): FileOutcome {
         result: deserializeRunResult(outcome.result),
         testCount: outcome.result.testCount,
         coverage: outcome.coverage,
+        obsoleteSnapshots: outcome.obsoleteSnapshots ?? [],
+        prunedSnapshots: outcome.prunedSnapshots ?? [],
       };
     case 'load-error':
       return {
@@ -130,9 +134,7 @@ export class WorkerPool {
       }
     };
 
-    await Promise.all(
-      Array.from({ length: concurrency }, () => consume()),
-    );
+    await Promise.all(Array.from({ length: concurrency }, () => consume()));
 
     return outcomes.filter(
       (outcome): outcome is FileOutcome => outcome !== undefined,
@@ -247,7 +249,9 @@ export class WorkerPool {
       });
       child.once('exit', (code, signal) => {
         if (code === 0) {
-          finish(failure(task.file, 'Worker exited without returning a result.'));
+          finish(
+            failure(task.file, 'Worker exited without returning a result.'),
+          );
           return;
         }
 
