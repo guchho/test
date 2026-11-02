@@ -1,8 +1,4 @@
-import {
-  assertEachCases,
-  formatEachTitle,
-  isEachCaseObject,
-} from './each.js';
+import { assertEachCases, formatEachTitle, isEachCaseObject } from './each.js';
 import type {
   HookFunction,
   HookType,
@@ -49,7 +45,10 @@ function reset(): void {
   currentSuite = rootSuite;
 }
 
-function assertName(name: unknown, kind: 'suite' | 'test'): asserts name is string {
+function assertName(
+  name: unknown,
+  kind: 'suite' | 'test',
+): asserts name is string {
   if (typeof name !== 'string' || name.trim().length === 0) {
     throw new TypeError(`A ${kind} name must be a non-empty string.`);
   }
@@ -64,12 +63,18 @@ function assertFunction(
   }
 }
 
-function assertTimeout(timeout: unknown): asserts timeout is number | undefined {
+function assertTimeout(
+  timeout: unknown,
+): asserts timeout is number | undefined {
   if (timeout === undefined) {
     return;
   }
 
-  if (typeof timeout !== 'number' || !Number.isFinite(timeout) || timeout <= 0) {
+  if (
+    typeof timeout !== 'number' ||
+    !Number.isFinite(timeout) ||
+    timeout <= 0
+  ) {
     throw new TypeError('Test timeout must be a positive, finite number.');
   }
 }
@@ -103,7 +108,11 @@ function normalizeTestOptions(
     return { timeout: options, retry: undefined };
   }
 
-  if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+  if (
+    options === null ||
+    typeof options !== 'object' ||
+    Array.isArray(options)
+  ) {
     throw new TypeError('Test options must be a number or an options object.');
   }
 
@@ -320,7 +329,12 @@ export interface RetryTestRegistrar {
 }
 
 export interface RetryTestApi {
-  (name: string, fn?: TestFunction, retries?: number, options?: number | TestOptions): void;
+  (
+    name: string,
+    fn?: TestFunction,
+    retries?: number,
+    options?: number | TestOptions,
+  ): void;
   (retries: number): RetryTestRegistrar;
 }
 
@@ -488,7 +502,11 @@ function createConditionalTest(condition: boolean): ConditionalTestApi {
   };
 
   const each: EachTest = ((cases: unknown) => {
-    return (name: string, fn: EachTestFunction, options?: number | TestOptions): void => {
+    return (
+      name: string,
+      fn: EachTestFunction,
+      options?: number | TestOptions,
+    ): void => {
       registerEachTests(cases, name, fn, options, mode);
     };
   }) as EachTest;
@@ -508,7 +526,11 @@ function createRetryRegistrar(retries: number): RetryTestRegistrar {
   };
 
   const each: EachTest = ((cases: unknown) => {
-    return (name: string, fn: EachTestFunction, options?: number | TestOptions): void => {
+    return (
+      name: string,
+      fn: EachTestFunction,
+      options?: number | TestOptions,
+    ): void => {
       registerEachTests(cases, name, fn, options, 'normal', retries);
     };
   }) as EachTest;
@@ -562,19 +584,35 @@ export const it: TestApi = Object.assign(
     registerTest(name, fn, 'normal', options);
   },
   {
-    skip: (name: string, fn?: TestFunction, options?: number | TestOptions): void => {
+    skip: (
+      name: string,
+      fn?: TestFunction,
+      options?: number | TestOptions,
+    ): void => {
       registerTest(name, fn, 'skip', options);
     },
-    only: (name: string, fn?: TestFunction, options?: number | TestOptions): void => {
+    only: (
+      name: string,
+      fn?: TestFunction,
+      options?: number | TestOptions,
+    ): void => {
       registerTest(name, fn, 'only', options);
     },
     todo: (name: string): void => {
       registerTest(name, undefined, 'todo');
     },
-    fails: (name: string, fn?: TestFunction, options?: number | TestOptions): void => {
+    fails: (
+      name: string,
+      fn?: TestFunction,
+      options?: number | TestOptions,
+    ): void => {
       registerTest(name, fn, 'fails', options);
     },
-    concurrent: (name: string, fn?: TestFunction, options?: number | TestOptions): void => {
+    concurrent: (
+      name: string,
+      fn?: TestFunction,
+      options?: number | TestOptions,
+    ): void => {
       registerTest(name, fn, 'concurrent', options);
     },
     runIf: (condition: boolean): ConditionalTestApi => {
@@ -612,7 +650,7 @@ export function todo(name: string): void {
   registerTest(name, undefined, 'todo');
 }
 
-export const failsFn = function(
+export const failsFn = function (
   name: string,
   fn?: TestFunction,
   options?: number | TestOptions,
@@ -673,17 +711,36 @@ function countTests(suite: SuiteDefinition): number {
       const args = cases[index];
       if (args === undefined) continue;
       if (isEachCaseObject(args)) {
-        registerTest(formatEachTitle(name, args, index), (() => (fn as any)(args)) as TestFunction, 'fails', timeout);
+        registerTest(
+          formatEachTitle(name, args, index),
+          (() => (fn as any)(args)) as TestFunction,
+          'fails',
+          timeout,
+        );
       } else if (Array.isArray(args)) {
-        registerTest(formatEachTitle(name, args, index), (() => (fn as any).apply(null, args as any[])) as TestFunction, 'fails', timeout);
+        registerTest(
+          formatEachTitle(name, args, index),
+          (() => (fn as any)(...args)) as TestFunction,
+          'fails',
+          timeout,
+        );
       } else {
-        registerTest(formatEachTitle(name, args, index), (() => (fn as any)(args)) as TestFunction, 'fails', timeout);
+        registerTest(
+          formatEachTitle(name, args, index),
+          (() => (fn as any)(args)) as TestFunction,
+          'fails',
+          timeout,
+        );
       }
     }
   };
 };
 (test as any).fails = (it as any).fails;
-(it as any).concurrent = function(name: string, fn?: TestFunction, timeout?: number) {
+(it as any).concurrent = function (
+  name: string,
+  fn?: TestFunction,
+  timeout?: number,
+) {
   registerTest(name, fn, 'concurrent', timeout);
 };
 (it as any).concurrent.each = (cases: any) => {
@@ -696,11 +753,26 @@ function countTests(suite: SuiteDefinition): number {
       const args = cases[index];
       if (args === undefined) continue;
       if (isEachCaseObject(args)) {
-        registerTest(formatEachTitle(name, args, index), (() => (fn as any)(args)) as TestFunction, 'concurrent', timeout);
+        registerTest(
+          formatEachTitle(name, args, index),
+          (() => (fn as any)(args)) as TestFunction,
+          'concurrent',
+          timeout,
+        );
       } else if (Array.isArray(args)) {
-        registerTest(formatEachTitle(name, args, index), (() => (fn as any).apply(null, args as any[])) as TestFunction, 'concurrent', timeout);
+        registerTest(
+          formatEachTitle(name, args, index),
+          (() => (fn as any)(...args)) as TestFunction,
+          'concurrent',
+          timeout,
+        );
       } else {
-        registerTest(formatEachTitle(name, args, index), (() => (fn as any)(args)) as TestFunction, 'concurrent', timeout);
+        registerTest(
+          formatEachTitle(name, args, index),
+          (() => (fn as any)(args)) as TestFunction,
+          'concurrent',
+          timeout,
+        );
       }
     }
   };
