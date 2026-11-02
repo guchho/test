@@ -2,8 +2,10 @@ import type { ReporterEntry, ReporterName } from '../config/types.js';
 import type { ReporterFactory } from '../plugins/types.js';
 import { createDefaultReporter } from './default.js';
 import { createDotReporter } from './dot.js';
+import { createGitHubReporter } from './github.js';
 import { createJsonReporter } from './json.js';
 import { createJUnitReporter } from './junit.js';
+import { createTapReporter } from './tap.js';
 import type { Reporter, ReporterIO } from './types.js';
 import { createVerboseReporter } from './verbose.js';
 
@@ -17,12 +19,12 @@ const builtInReporterNames = new Set<ReporterName>([
   'dot',
   'json',
   'junit',
+  'tap',
+  'github',
+  'github-actions',
 ]);
 
-export function createReporter(
-  name: ReporterName,
-  io: ReporterIO,
-): Reporter {
+export function createReporter(name: ReporterName, io: ReporterIO): Reporter {
   switch (name) {
     case 'default':
       return createDefaultReporter(io);
@@ -34,6 +36,11 @@ export function createReporter(
       return createJsonReporter(io);
     case 'junit':
       return createJUnitReporter(io);
+    case 'tap':
+      return createTapReporter(io);
+    case 'github':
+    case 'github-actions':
+      return createGitHubReporter(io);
   }
 }
 
@@ -43,14 +50,11 @@ export function createReporters(
   custom: ReadonlyMap<string, ReporterFactory> = new Map(),
 ): Reporter[] {
   const resolved =
-    entries.length === 0
-      ? (['default'] as ReporterEntry[])
-      : [...entries];
+    entries.length === 0 ? (['default'] as ReporterEntry[]) : [...entries];
 
   return resolved.map((entry) => {
     const name = typeof entry === 'string' ? entry : entry[0];
-    const options =
-      typeof entry === 'string' ? {} : entry[1];
+    const options = typeof entry === 'string' ? {} : entry[1];
 
     if (builtInReporterNames.has(name as ReporterName)) {
       return createReporter(name as ReporterName, io);
@@ -65,9 +69,4 @@ export function createReporters(
   });
 }
 
-export type {
-  FileReport,
-  Reporter,
-  ReporterIO,
-  RunReport,
-} from './types.js';
+export type { FileReport, Reporter, ReporterIO, RunReport } from './types.js';
