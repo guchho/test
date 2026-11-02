@@ -1,3 +1,8 @@
+---
+title: Quick Start
+description: Write a first test file, add a config, and run the test suite.
+---
+
 # Quick Start
 
 ## 1. Write a test file
