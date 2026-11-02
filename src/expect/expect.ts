@@ -10,10 +10,7 @@ import {
 import type { AsymmetricMatcher } from './asymmetric.js';
 import { formatDiff } from './diff.js';
 import { AssertionError } from './errors.js';
-import {
-  addEqualityTest,
-  deepEqual,
-} from './equality.js';
+import { addEqualityTest, deepEqual } from './equality.js';
 import { formatValue } from './format.js';
 import { builtInMatchers } from './matchers.js';
 import type {
@@ -66,8 +63,14 @@ export interface Matchers<R = void> {
   toHaveReturned(): R;
   toHaveReturnedWith(expected: unknown): R;
   toHaveReturnedTimes(expected: number): R;
-  toMatchSnapshot(hint?: string): R;
-  toMatchInlineSnapshot(snapshot?: string): R;
+  toMatchSnapshot(
+    propertiesOrHint?: Record<PropertyKey, unknown> | string,
+    hint?: string,
+  ): R;
+  toMatchInlineSnapshot(
+    propertiesOrSnapshot?: Record<PropertyKey, unknown> | string,
+    snapshot?: string,
+  ): R;
 }
 
 export type AsyncMatchers = Matchers<Promise<void>>;
@@ -119,9 +122,7 @@ interface ExpectState {
   readonly soft: boolean;
 }
 
-const matchers = new Map<string, Matcher>(
-  Object.entries(builtInMatchers),
-);
+const matchers = new Map<string, Matcher>(Object.entries(builtInMatchers));
 
 const reservedMatcherNames = new Set(['not', 'resolves', 'rejects']);
 
@@ -250,10 +251,7 @@ async function runAsyncMatcher(
   runResult(result, state);
 }
 
-function handleSoftFailure(
-  error: unknown,
-  state: ExpectState,
-): void {
+function handleSoftFailure(error: unknown, state: ExpectState): void {
   if (state.soft && error instanceof AssertionError) {
     softFailures.push(error);
     return;
@@ -291,12 +289,24 @@ function assertPollOptions(options: PollOptions | undefined): {
   const timeout = options?.timeout ?? defaultPollTimeout;
   const interval = options?.interval ?? defaultPollInterval;
 
-  if (typeof timeout !== 'number' || !Number.isFinite(timeout) || timeout <= 0) {
-    throw new TypeError('expect.poll timeout must be a positive, finite number.');
+  if (
+    typeof timeout !== 'number' ||
+    !Number.isFinite(timeout) ||
+    timeout <= 0
+  ) {
+    throw new TypeError(
+      'expect.poll timeout must be a positive, finite number.',
+    );
   }
 
-  if (typeof interval !== 'number' || !Number.isFinite(interval) || interval <= 0) {
-    throw new TypeError('expect.poll interval must be a positive, finite number.');
+  if (
+    typeof interval !== 'number' ||
+    !Number.isFinite(interval) ||
+    interval <= 0
+  ) {
+    throw new TypeError(
+      'expect.poll interval must be a positive, finite number.',
+    );
   }
 
   return { timeout, interval };
@@ -308,11 +318,7 @@ function delay(ms: number): Promise<void> {
   });
 }
 
-function formatPollError(
-  name: string,
-  error: unknown,
-  timeout: number,
-): Error {
+function formatPollError(name: string, error: unknown, timeout: number): Error {
   if (error instanceof Error) {
     return error;
   }
@@ -440,14 +446,12 @@ function createExpectation(state: ExpectState): Expectation {
   if (state.mode === 'sync') {
     Object.defineProperty(target, 'resolves', {
       enumerable: true,
-      get: (): Expectation =>
-        createExpectation({ ...state, mode: 'resolves' }),
+      get: (): Expectation => createExpectation({ ...state, mode: 'resolves' }),
     });
 
     Object.defineProperty(target, 'rejects', {
       enumerable: true,
-      get: (): Expectation =>
-        createExpectation({ ...state, mode: 'rejects' }),
+      get: (): Expectation => createExpectation({ ...state, mode: 'rejects' }),
     });
   }
 
