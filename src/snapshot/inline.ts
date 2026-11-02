@@ -14,9 +14,12 @@ function normalize(file: string): string {
 
   if (result.startsWith('file://')) {
     try {
-      result = fileURLToPath(result).replace(/\\/g, '/');
+      const url = new URL(result);
+      url.search = '';
+      url.hash = '';
+      result = fileURLToPath(url).replace(/\\/g, '/');
     } catch {
-      result = result.replace(/^file:\/\//, '');
+      result = result.replace(/^file:\/\//, '').replace(/[?#].*$/, '');
     }
   }
 
@@ -123,13 +126,19 @@ function replaceInlineSnapshot(
   call: ts.CallExpression,
   sourceFile: ts.SourceFile,
   value: string,
+  argumentIndex: number,
 ): string {
-  const argument = call.arguments[0];
+  const argument = call.arguments[argumentIndex];
 
   if (argument !== undefined) {
     const start = argument.getStart(sourceFile);
     const end = call.arguments[call.arguments.length - 1]?.getEnd() ?? start;
     return `${source.slice(0, start)}${literal(value)}${source.slice(end)}`;
+  }
+
+  if (argumentIndex > 0) {
+    const close = call.getEnd() - 1;
+    return `${source.slice(0, close)}, ${literal(value)}${source.slice(close)}`;
   }
 
   const open = source.indexOf('(', call.expression.getEnd());
@@ -143,6 +152,7 @@ function replaceInlineSnapshot(
 export function updateInlineSnapshot(
   testFile: string,
   value: string,
+  argumentIndex = 0,
 ): void {
   const location = callerLocation(testFile);
 
@@ -152,9 +162,8 @@ export function updateInlineSnapshot(
     );
   }
 
-  const file = normalize(location.file) === normalize(testFile)
-    ? testFile
-    : location.file;
+  const file =
+    normalize(location.file) === normalize(testFile) ? testFile : location.file;
   const source = readFileSync(file, 'utf8');
   const sourceFile = ts.createSourceFile(
     file,
@@ -177,7 +186,7 @@ export function updateInlineSnapshot(
 
   writeFileSync(
     file,
-    replaceInlineSnapshot(source, call, sourceFile, value),
+    replaceInlineSnapshot(source, call, sourceFile, value, argumentIndex),
     'utf8',
   );
 }
