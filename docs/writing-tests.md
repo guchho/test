@@ -1,3 +1,8 @@
+---
+title: Writing Tests
+description: Register suites and tests, use modifiers, table-driven cases, and timeouts.
+---
+
 # Writing Tests
 
 Guchho Test uses a suite/test registration API. Tests are registered when the
@@ -75,7 +80,7 @@ Supported placeholders:
 
 A title with more placeholders than a case provides throws a `TypeError`. Object
 and tagged-template case forms are not implemented yet; see
-[`ROADMAP.md`](../ROADMAP.md).
+[`ROADMAP.md`](https://github.com/guchho/test/blob/main/ROADMAP.md).
 
 ## Synchronous and asynchronous tests
 
