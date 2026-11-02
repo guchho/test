@@ -2,9 +2,9 @@
 src/
 tests/
 demo/
-docs/
 scripts/
 .github/
+docs/
 
 # Tooling and editor configuration
 tsconfig*.json
