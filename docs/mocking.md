@@ -1,3 +1,8 @@
+---
+title: Mocking
+description: Mock functions, spies, fake timers, and ESM module mocking.
+---
+
 # Mocking
 
 Import `mock` from `@guchho/test`:
