@@ -2,24 +2,15 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import {
-  ConfigError,
-  loadConfig,
-  resolveConfig,
-} from '../config/load.js';
+import { ConfigError, loadConfig, resolveConfig } from '../config/load.js';
 import type {
   CoverageConfig,
+  EnvironmentName,
   ReporterEntry,
 } from '../config/types.js';
 import { buildCoverageReport } from '../coverage/collect.js';
-import {
-  checkThresholds,
-  writeCoverageReport,
-} from '../coverage/report.js';
-import type {
-  CoveragePayload,
-  CoverageReport,
-} from '../coverage/types.js';
+import { checkThresholds, writeCoverageReport } from '../coverage/report.js';
+import type { CoveragePayload, CoverageReport } from '../coverage/types.js';
 import { loadPlugins } from '../plugins/load.js';
 import type { ReporterFactories } from '../plugins/load.js';
 import { createReporters, ReporterError } from '../reporters/index.js';
@@ -28,12 +19,10 @@ import { formatError } from '../runner/errors.js';
 import { WorkerPool } from '../runner/pool.js';
 import type { FileOutcome } from '../runner/pool.js';
 import type { WorkerInput } from '../runner/serialize.js';
-import type {
-  ExecutionPool,
-  RunSummary,
-} from '../runner/types.js';
+import type { ExecutionPool, RunSummary } from '../runner/types.js';
 import { registerTypeScriptLoader } from '../transform/register.js';
 import { watchTests } from '../watch/watcher.js';
+import { changedFiles, selectAffectedFiles } from './changed.js';
 import { discoverTestFiles } from './discovery.js';
 import { helpText } from './help.js';
 import { CliError, parseArgs } from './parser.js';
@@ -54,10 +43,15 @@ interface ExecutionOptions {
   readonly bail: boolean;
   readonly updateSnapshots: boolean;
   readonly coverage: boolean;
+  readonly silent: boolean;
   readonly setupFiles: readonly string[];
   readonly setupFilesAfterEnv: readonly string[];
   readonly globalSetup: string | undefined;
   readonly globalTeardown: string | undefined;
+  readonly environment: EnvironmentName;
+  readonly environmentOptions: Readonly<Record<string, unknown>>;
+  readonly globals: boolean;
+  readonly tsconfig: string | undefined;
 }
 
 interface GlobalHookContext {
@@ -108,6 +102,7 @@ async function runGlobalHook(
       `Failed to load ${label} module "${file}": ${
         error instanceof Error ? error.message : String(error)
       }`,
+      { cause: error },
     );
   }
 
@@ -196,9 +191,7 @@ function applyShard(
     return [...files];
   }
 
-  return files.filter(
-    (_, index) => index % shard.count === shard.index - 1,
-  );
+  return files.filter((_, index) => index % shard.count === shard.index - 1);
 }
 
 async function resolveFiles(
@@ -207,6 +200,7 @@ async function resolveFiles(
   stderr: (text: string) => void,
   include: readonly string[],
   exclude: readonly string[],
+  warnWhenEmpty: boolean,
 ): Promise<string[]> {
   if (files.length > 0) {
     return resolveExplicitFiles(files, cwd);
@@ -218,7 +212,7 @@ async function resolveFiles(
     exclude,
   });
 
-  if (discovered.length === 0) {
+  if (discovered.length === 0 && warnWhenEmpty) {
     stderr('guchho-test: No test files found.\n');
   }
 
@@ -264,8 +258,13 @@ async function executeFiles(
     bail: options.bail,
     updateSnapshots: options.updateSnapshots,
     coverage: coverageConfig.enabled === true,
+    silent: options.silent,
     setupFiles,
     setupFilesAfterEnv,
+    environment: options.environment,
+    environmentOptions: options.environmentOptions,
+    globals: options.globals,
+    tsconfig: options.tsconfig,
   }));
 
   let executionError = false;
@@ -336,10 +335,7 @@ async function executeFiles(
         exclude: coverageConfig.exclude ?? [],
         payloads: coveragePayloads,
       });
-      coverageFailures = checkThresholds(
-        coverageReport,
-        coverageConfig,
-      ).length;
+      coverageFailures = checkThresholds(coverageReport, coverageConfig).length;
     } catch (error) {
       coverageError = true;
       io.stderr(`Failed to collect coverage: ${formatError(error)}\n`);
@@ -370,7 +366,13 @@ async function executeFiles(
         stderr: io.stderr,
         machine: reporterEntries.some((entry) => {
           const name = typeof entry === 'string' ? entry : entry[0];
-          return name === 'json' || name === 'junit';
+          return (
+            name === 'json' ||
+            name === 'junit' ||
+            name === 'tap' ||
+            name === 'github' ||
+            name === 'github-actions'
+          );
         }),
       });
     } catch (error) {
@@ -381,8 +383,12 @@ async function executeFiles(
     if (thresholds.length > 0) {
       io.stderr('Coverage thresholds not met:\n');
       for (const failure of thresholds) {
+        const label =
+          failure.file === undefined
+            ? failure.metric
+            : `${failure.file}: ${failure.metric}`;
         io.stderr(
-          `  ${failure.metric}: ${failure.actual.toFixed(2)}% is below ${failure.expected.toFixed(2)}%\n`,
+          `  ${label}: ${failure.actual.toFixed(2)}% is below ${failure.expected.toFixed(2)}%\n`,
         );
       }
     }
@@ -452,6 +458,18 @@ function publishOutcome(
     reporter.onFileFinish?.(report);
   }
 
+  const pruned = new Set(outcome.prunedSnapshots);
+
+  for (const key of outcome.obsoleteSnapshots) {
+    if (pruned.has(key)) {
+      io.stdout(`Removed obsolete snapshot "${key}" in "${display}".\n`);
+    } else {
+      io.stderr(
+        `Warning: obsolete snapshot "${key}" in "${display}". Run with --update to remove it.\n`,
+      );
+    }
+  }
+
   onReport(report);
 }
 
@@ -462,6 +480,10 @@ function executionOptions(
   setupFilesAfterEnv: readonly string[],
   globalSetup: string | undefined,
   globalTeardown: string | undefined,
+  environment: EnvironmentName,
+  environmentOptions: Readonly<Record<string, unknown>>,
+  globals: boolean,
+  tsconfig: string | undefined,
 ): ExecutionOptions {
   return {
     filter: parsed.filter,
@@ -472,10 +494,15 @@ function executionOptions(
     bail: parsed.bail,
     updateSnapshots: parsed.updateSnapshots,
     coverage: parsed.coverage,
+    silent: parsed.silent,
     setupFiles,
     setupFilesAfterEnv,
     globalSetup,
     globalTeardown,
+    environment,
+    environmentOptions,
+    globals,
+    tsconfig,
   };
 }
 
@@ -515,10 +542,10 @@ async function runWatch(
       signal: controller.signal,
       log: io.stdout,
       error: io.stderr,
-      run: async (files) => {
+      run: async (files, filter) => {
         const code = await executeFiles(
           files,
-          options,
+          { ...options, filter: filter ?? options.filter },
           entries,
           coverageConfig,
           customReporters,
@@ -567,10 +594,14 @@ export async function main(
   }
 
   try {
-    registerTypeScriptLoader();
+    registerTypeScriptLoader({ cwd: io.cwd });
 
     const loaded = await loadConfig(io.cwd, parsed.config);
     const config = resolveConfig(loaded, { timeout: parsed.timeout });
+    registerTypeScriptLoader({
+      cwd: io.cwd,
+      tsconfig: config.tsconfig,
+    });
     const options = executionOptions(
       parsed,
       config.timeout,
@@ -578,6 +609,12 @@ export async function main(
       config.setupFilesAfterEnv,
       config.globalSetup,
       config.globalTeardown,
+      config.environment,
+      config.environmentOptions,
+      config.globals,
+      config.tsconfig === undefined
+        ? undefined
+        : path.resolve(io.cwd, config.tsconfig),
     );
     const entries = reporterEntries(parsed, config.reporters);
     const coverageConfig = parsed.coverage
@@ -597,25 +634,57 @@ export async function main(
       );
     }
 
-    const files = await resolveFiles(
+    let files = await resolveFiles(
       parsed.files,
       io.cwd,
       io.stderr,
       config.include,
       config.exclude,
+      !parsed.passWithNoTests,
     );
 
+    if (parsed.changed || parsed.related.length > 0) {
+      const changed: string[] = parsed.changed
+        ? await changedFiles(io.cwd, parsed.changedSince)
+        : [];
+      for (const file of parsed.related) {
+        changed.push(path.resolve(io.cwd, file));
+      }
+
+      files = await selectAffectedFiles(files, changed);
+
+      if (files.length === 0 && !parsed.passWithNoTests) {
+        io.stderr(
+          'guchho-test: No test files matched the current selection.\n',
+        );
+      }
+    }
+
     if (files.length === 0) {
-      return 2;
+      return parsed.passWithNoTests ? 0 : 2;
     }
 
     const selectedFiles = applyShard(files, parsed.shard);
 
-    if (parsed.shard !== undefined && selectedFiles.length === 0) {
+    if (selectedFiles.length === 0) {
+      if (parsed.passWithNoTests) {
+        return 0;
+      }
+
       io.stderr(
-        `guchho-test: Shard ${parsed.shard.index}/${parsed.shard.count} selected no test files.\n`,
+        parsed.shard === undefined
+          ? 'guchho-test: No test files selected.\n'
+          : `guchho-test: Shard ${parsed.shard.index}/${parsed.shard.count} selected no test files.\n`,
       );
       return 2;
+    }
+
+    if (parsed.listTests) {
+      for (const file of selectedFiles) {
+        io.stdout(`${file}\n`);
+      }
+
+      return 0;
     }
 
     return await executeFiles(
